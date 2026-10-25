@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinUI3Shell.Pages.VersionSettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Padding="24" RowDefinitions="Auto,*">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+            <Button
+                AutomationProperties.Name="返回"
+                ToolTipService.ToolTip="返回"
+                Click="Back_Click">
+                <SymbolIcon Symbol="Back" />
+            </Button>
+            <TextBlock
+                x:Name="TitleText"
+                Style="{StaticResource TitleTextBlockStyle}"
+                VerticalAlignment="Center" />
+        </StackPanel>
+
+        <NavigationView
+            x:Name="SideBar"
+            Grid.Row="1"
+            Margin="0,12,0,0"
+            AlwaysShowHeader="False"
+            IsBackButtonVisible="Collapsed"
+            IsPaneToggleButtonVisible="False"
+            IsSettingsVisible="False"
+            OpenPaneLength="140"
+            PaneDisplayMode="Left"
+            SelectionChanged="SideBar_SelectionChanged">
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="常规" Tag="general" Margin="0,8,0,0" IsSelected="True" />
+                <NavigationViewItem Content="设置" Tag="launch" />
+                <NavigationViewItem Content="Mod 管理" Tag="mods" />
+            </NavigationView.MenuItems>
+            <Frame x:Name="SubFrame">
+                <Frame.ContentTransitions>
+                    <TransitionCollection>
+                        <EntranceThemeTransition />
+                    </TransitionCollection>
+                </Frame.ContentTransitions>
+            </Frame>
+        </NavigationView>
+    </Grid>
+</Page>

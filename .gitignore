@@ -1,0 +1,14 @@
+# 编译垃圾（核心）
+[Bb]in/
+[Oo]bj/
+*.dll
+*.exe
+*.pdb
+
+# VS 缓存
+.vs/
+*.user
+
+# Python 缓存
+__pycache__/
+*.pyc

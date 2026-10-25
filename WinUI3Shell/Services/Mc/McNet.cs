@@ -1,0 +1,219 @@
+using System.Diagnostics;
+using System.Net;
+using System.Net.Http;
+using System.Security.Cryptography;
+
+namespace WinUI3Shell.Services.Mc;
+
+/// <summary>.minecraft 规范的游戏目录结构（默认 %USERPROFILE%\.mnymc）。</summary>
+public static class McPaths
+{
+    public static readonly string GameDir = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".mnymc");
+    public static string VersionsDir => Path.Combine(GameDir, "versions");
+    public static string VersionDir(string id) => Path.Combine(VersionsDir, id);
+    public static string LibrariesDir => Path.Combine(GameDir, "libraries");
+    public static string AssetsDir => Path.Combine(GameDir, "assets");
+    public static string RuntimesDir => Path.Combine(GameDir, "runtimes");
+}
+
+/// <summary>下载进度：阶段名、字节进度、文件数进度。</summary>
+public sealed record McProgress(string Phase, long DoneBytes, long TotalBytes, int DoneFiles, int TotalFiles);
+
+/// <summary>镜像源：官方 / BMCLAPI，按域名重写 URL。</summary>
+public static class Mirror
+{
+    public const string Official = "official";
+    public const string Bmclapi = "bmclapi";
+
+    private static readonly Dictionary<string, Dictionary<string, string>> HostRewrites = new()
+    {
+        [Official] = new(),
+        [Bmclapi] = new()
+        {
+            ["launchermeta.mojang.com"] = "bmclapi2.bangbang93.com",
+            ["piston-meta.mojang.com"] = "bmclapi2.bangbang93.com",
+            ["piston-data.mojang.com"] = "bmclapi2.bangbang93.com",
+            ["libraries.minecraft.net"] = "bmclapi2.bangbang93.com/maven",
+            ["resources.download.minecraft.net"] = "bmclapi2.bangbang93.com/assets",
+            ["maven.minecraftforge.net"] = "bmclapi2.bangbang93.com/maven",
+            ["files.minecraftforge.net"] = "bmclapi2.bangbang93.com/maven",
+            // NeoForge 官方仓库带 /releases 前缀，BMCLAPI maven 代理没有，需剥离
+            ["maven.neoforged.net"] = "bmclapi2.bangbang93.com/maven|/releases",
+        },
+    };
+
+    public static string Rewrite(string url, string mirror = Official)
+    {
+        if (!HostRewrites.TryGetValue(mirror, out var rules) || rules.Count == 0)
+            return url;
+        var uri = new Uri(url);
+        if (!rules.TryGetValue(uri.Host, out var target))
+            return url;
+        string strip = "";
+        int bar = target.IndexOf('|');
+        if (bar >= 0)
+        {
+            strip = target[(bar + 1)..];
+            target = target[..bar];
+        }
+        string host, path = uri.AbsolutePath;
+        if (strip.Length > 0 && path.StartsWith(strip, StringComparison.Ordinal))
+            path = path[strip.Length..];
+        int slash = target.IndexOf('/');
+        if (slash >= 0)
+        {
+            host = target[..slash];
+            path = "/" + target[(slash + 1)..] + path;
+        }
+        else
+        {
+            host = target;
+        }
+        return $"{uri.Scheme}://{host}{path}{uri.Query}";
+    }
+}
+
+public sealed record McDownloadTask(string Url, string Dest, string? Sha1 = null, long? Size = null);
+
+public static class McHttp
+{
+    public static readonly HttpClient Client = Create();
+
+    private static HttpClient Create()
+    {
+        var c = new HttpClient(new HttpClientHandler
+        {
+            AllowAutoRedirect = true,
+            AutomaticDecompression = DecompressionMethods.All,
+        });
+        c.DefaultRequestHeaders.UserAgent.ParseAdd("MnyMC/1.0");
+        c.Timeout = TimeSpan.FromMinutes(30);
+        return c;
+    }
+}
+
+/// <summary>多线程下载：sha1/size 校验、失败重试、进度汇报、已存在文件自动跳过。</summary>
+public static class Downloader
+{
+    private const int Retries = 3;
+
+    public static bool IsValid(McDownloadTask t)
+    {
+        if (!File.Exists(t.Dest)) return false;
+        if (t.Size is long size && new FileInfo(t.Dest).Length != size) return false;
+        if (t.Sha1 is string sha1 && !Sha1Of(t.Dest).Equals(sha1, StringComparison.OrdinalIgnoreCase)) return false;
+        return true;
+    }
+
+    private static string Sha1Of(string path)
+    {
+        using var fs = File.OpenRead(path);
+        return Convert.ToHexString(SHA1.HashData(fs)).ToLowerInvariant();
+    }
+
+    /// <summary>删除游戏目录下所有残留的 .part 半成品文件（启动时调用：上次被关闭/强杀导致的半截下载不续传，直接清掉）。</summary>
+    public static int CleanupPartialDownloads()
+    {
+        int count = 0;
+        if (!Directory.Exists(McPaths.GameDir)) return 0;
+        foreach (string file in Directory.EnumerateFiles(McPaths.GameDir, "*.part", SearchOption.AllDirectories))
+        {
+            try { File.Delete(file); count++; }
+            catch { /* 文件被占用等情况跳过 */ }
+        }
+        return count;
+    }
+
+    /// <summary>下载单个文件，onChunk 回调报告每次写入的字节数。</summary>
+    public static async Task DownloadFileAsync(McDownloadTask t, Action<long>? onChunk = null, CancellationToken ct = default)
+    {
+        if (IsValid(t)) return;
+        Directory.CreateDirectory(Path.GetDirectoryName(t.Dest)!);
+        string tmp = t.Dest + ".part";
+        Exception? last = null;
+        for (int attempt = 1; attempt <= Retries + 1; attempt++)
+        {
+            try
+            {
+                using var resp = await McHttp.Client.GetAsync(t.Url, HttpCompletionOption.ResponseHeadersRead, ct);
+                resp.EnsureSuccessStatusCode();
+                await using (var input = await resp.Content.ReadAsStreamAsync(ct))
+                await using (var output = File.Create(tmp))
+                {
+                    var buffer = new byte[1 << 16];
+                    int n;
+                    while ((n = await input.ReadAsync(buffer, ct)) > 0)
+                    {
+                        await output.WriteAsync(buffer.AsMemory(0, n), ct);
+                        onChunk?.Invoke(n);
+                    }
+                }
+                File.Move(tmp, t.Dest, true);
+                if (IsValid(t)) return;
+                last = new InvalidDataException($"sha1/size 校验失败: {t.Url}");
+            }
+            catch (OperationCanceledException)
+            {
+                TryDelete(tmp); // 取消（如用户点「取消」）：半成品立刻删，不留到下次启动
+                throw;
+            }
+            catch (Exception ex)
+            {
+                TryDelete(tmp);
+                last = ex;
+            }
+        }
+        throw new HttpRequestException($"下载失败（重试 {Retries} 次后仍不成功）: {t.Url}", last);
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { File.Delete(path); }
+        catch { /* 忽略清理失败 */ }
+    }
+
+    /// <summary>并发下载一批任务，进度按字节+文件数汇报（约每 100ms 一次）。</summary>
+    public static async Task DownloadManyAsync(IReadOnlyList<McDownloadTask> tasks, int workers,
+        string phase, IProgress<McProgress>? progress, CancellationToken ct = default)
+    {
+        var pending = tasks.Where(t => !IsValid(t)).ToList();
+        if (pending.Count == 0) return;
+
+        long totalBytes = pending.Sum(t => t.Size ?? 0);
+        long doneBytes = 0;
+        int doneFiles = 0;
+        long lastReportMs = 0;
+        var sw = Stopwatch.StartNew();
+
+        void OnChunk(long n)
+        {
+            Interlocked.Add(ref doneBytes, n);
+            long ms = sw.ElapsedMilliseconds;
+            if (ms - Interlocked.Read(ref lastReportMs) > 100)
+            {
+                Interlocked.Exchange(ref lastReportMs, ms);
+                progress?.Report(new McProgress(phase,
+                    Interlocked.Read(ref doneBytes), totalBytes,
+                    Volatile.Read(ref doneFiles), pending.Count));
+            }
+        }
+
+        using var sem = new SemaphoreSlim(workers);
+        var running = pending.Select(async t =>
+        {
+            await sem.WaitAsync(ct);
+            try
+            {
+                await DownloadFileAsync(t, OnChunk, ct);
+            }
+            finally
+            {
+                sem.Release();
+                Interlocked.Increment(ref doneFiles);
+            }
+        }).ToList();
+        await Task.WhenAll(running);
+        progress?.Report(new McProgress(phase, Interlocked.Read(ref doneBytes), totalBytes, pending.Count, pending.Count));
+    }
+}

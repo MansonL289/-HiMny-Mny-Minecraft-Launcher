@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinUI3Shell.Pages.HomePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Loaded="HomePage_Loaded">
+
+    <Grid x:Name="RootGrid" Padding="32">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- 中间：直角头像(带阴影) + 名称(点击后变输入框) -->
+        <StackPanel
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Spacing="12">
+            <Grid Width="56" Height="56" HorizontalAlignment="Center">
+                <!-- 阴影承载层：放在头像后面，只露出下方偏移的阴影 -->
+                <Border x:Name="AvatarShadowHost" />
+                <Border
+                    x:Name="AvatarBorder"
+                    Width="56"
+                    Height="56">
+                    <Border.Background>
+                        <ImageBrush ImageSource="ms-appx:///Assets/Head.png" Stretch="UniformToFill" />
+                    </Border.Background>
+                </Border>
+            </Grid>
+
+            <Grid HorizontalAlignment="Center">
+                <TextBlock
+                    x:Name="NameText"
+                    Text="Steve"
+                    FontSize="16"
+                    FontWeight="SemiBold"
+                    Padding="4,2"
+                    Tapped="NameText_Tapped"
+                    PointerEntered="NameText_PointerEntered"
+                    PointerExited="NameText_PointerExited" />
+
+                <TextBox
+                    x:Name="NameBox"
+                    Width="140"
+                    FontSize="16"
+                    MaxLength="16"
+                    TextAlignment="Center"
+                    Visibility="Collapsed"
+                    TextChanged="NameBox_TextChanged"
+                    LostFocus="NameBox_LostFocus"
+                    KeyDown="NameBox_KeyDown" />
+            </Grid>
+        </StackPanel>
+
+        <!-- 启动状态：进度条 + 状态文字（仅启动流程中显示） -->
+        <StackPanel
+            x:Name="LaunchProgressPanel"
+            Grid.Row="1"
+            Margin="0,0,0,12"
+            Spacing="4"
+            Visibility="Collapsed">
+            <ProgressBar x:Name="LaunchProgress" IsIndeterminate="True" />
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock
+                    x:Name="LaunchStatus"
+                    VerticalAlignment="Center"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    TextTrimming="CharacterEllipsis" />
+                <Button
+                    x:Name="CancelLaunchButton"
+                    Grid.Column="1"
+                    Padding="12,2"
+                    Click="CancelLaunch_Click"
+                    Content="取消"
+                    FontSize="12"
+                    Visibility="Collapsed" />
+            </Grid>
+        </StackPanel>
+
+        <!-- 底部：左侧版本设置 + 下拉框，右侧启动按钮 -->
+        <Grid Grid.Row="2">
+            <StackPanel
+                HorizontalAlignment="Left"
+                VerticalAlignment="Bottom"
+                Spacing="8">
+                <Button
+                    x:Name="VersionSettingsButton"
+                    Content="版本设置"
+                    Width="180"
+                    HorizontalAlignment="Left"
+                    IsEnabled="False"
+                    Click="VersionSettingsButton_Click" />
+                <ComboBox
+                    x:Name="VersionComboBox"
+                    Width="180"
+                    PlaceholderText="选择版本"
+                    SelectionChanged="VersionComboBox_SelectionChanged" />
+            </StackPanel>
+
+            <Button
+                x:Name="LaunchButton"
+                Content="启动"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Bottom"
+                MinWidth="140"
+                MinHeight="40"
+                IsEnabled="False"
+                Style="{StaticResource AccentButtonStyle}"
+                Click="LaunchButton_Click" />
+        </Grid>
+    </Grid>
+</Page>

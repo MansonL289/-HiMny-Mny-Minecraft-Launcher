@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinUI3Shell.Pages.VersionLaunchSettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ScrollViewer>
+        <StackPanel MaxWidth="560" Padding="20,20,20,24" Spacing="12">
+            <!-- 启动 -->
+            <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="启动" />
+            <ToggleSwitch
+                x:Name="IsolationToggle"
+                Header="版本隔离（存档、Mod、截图等存在版本目录下）"
+                Toggled="Setting_Changed" />
+            <ComboBox
+                x:Name="JavaCombo"
+                Width="240"
+                Header="Java（自定义的打不开时自动回退为自动选择）"
+                HorizontalAlignment="Left"
+                SelectionChanged="Setting_Changed">
+                <ComboBoxItem Content="自动选择" Tag="" />
+                <ComboBoxItem Content="自定义" Tag="custom" />
+            </ComboBox>
+            <StackPanel
+                x:Name="JavaCustomPanel"
+                Orientation="Horizontal"
+                Spacing="8"
+                Visibility="Collapsed">
+                <TextBox
+                    x:Name="JavaPathBox"
+                    Width="320"
+                    IsReadOnly="True"
+                    PlaceholderText="选择 java.exe / javaw.exe" />
+                <Button Click="BrowseJava_Click" Content="浏览..." />
+                <Button Click="ClearJava_Click" Content="清除" />
+            </StackPanel>
+
+            <!-- 内存分配 -->
+            <TextBlock
+                Margin="0,14,0,0"
+                Style="{StaticResource BodyStrongTextBlockStyle}"
+                Text="内存分配" />
+            <ComboBox
+                x:Name="MemoryCombo"
+                Width="240"
+                Header="内存分配"
+                HorizontalAlignment="Left"
+                SelectionChanged="Setting_Changed">
+                <ComboBoxItem Content="跟随全局" Tag="global" />
+                <ComboBoxItem Content="自动配置" Tag="auto" />
+                <ComboBoxItem Content="自定义" Tag="custom" />
+            </ComboBox>
+            <NumberBox
+                x:Name="MemoryBox"
+                Width="240"
+                Header="内存 (MB)"
+                HorizontalAlignment="Left"
+                Minimum="512"
+                SpinButtonPlacementMode="Inline"
+                Visibility="Collapsed"
+                ValueChanged="MemoryBox_ValueChanged" />
+
+            <!-- 服务器 -->
+            <TextBlock
+                Margin="0,14,0,0"
+                Style="{StaticResource BodyStrongTextBlockStyle}"
+                Text="服务器" />
+            <TextBox
+                x:Name="ServerBox"
+                Width="320"
+                Header="自动加入服务器"
+                HorizontalAlignment="Left"
+                PlaceholderText="例：mc.example.com 或 mc.example.com:25565"
+                LostFocus="Setting_Changed" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>
