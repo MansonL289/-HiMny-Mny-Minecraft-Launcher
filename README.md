@@ -11,7 +11,6 @@
 - 自动检测加载器对所选 MC 版本的适配，**不支持的选项直接禁用**，避免装到一半报错
 - **BMCLAPI 镜像加速**（可切换官方源），版本列表、库文件、资源、加载器均走镜像
 - 独立**下载任务页**：后台并行下载、实时进度、单任务取消、一键清除已完成
-- **断点不续传**：半成品写入 `.part` 临时文件，程序被关闭/强杀后下次启动自动清理，不产生损坏文件
 
 ### 启动
 - 离线账号（自定义玩家名），完整支持新旧两种启动参数格式（`arguments` / `minecraftArguments`）
@@ -42,10 +41,10 @@ dotnet build WinUI3Shell/WinUI3Shell.csproj -p:Platform=x64
 WinUI3Shell\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\WinUI3Shell.exe
 ```
 
-仓库根目录的 `run_window.py` 可直接启动已构建的 exe：
+仓库根目录的 `直接运行用我.py` 可直接启动已构建的程序：
 
 ```powershell
-python run_window.py
+python 直接运行用我.py
 ```
 
 ## 目录结构
