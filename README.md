@@ -36,9 +36,11 @@
 
 ## 构建与运行
 
+前置要求：安装 [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) 和 Visual Studio 的「Windows 应用 SDK C# 模板」工作负载（或直接装 WinUI 3 开发环境）。
+
 ```powershell
 dotnet build WinUI3Shell/WinUI3Shell.csproj -p:Platform=x64
-WinUI3Shell\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\WinUI3Shell.exe
+WinUI3Shell\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\MnyMinecraftLauncher.exe
 ```
 
 仓库根目录的 `直接运行用我.py` 可直接启动已构建的程序：
@@ -46,6 +48,22 @@ WinUI3Shell\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\WinUI3Shell.exe
 ```powershell
 python 直接运行用我.py
 ```
+
+## 打包分发
+
+一条命令打出完整独立包，内置 .NET 8 运行时和 Windows App SDK，对方电脑什么都不用装：
+
+```powershell
+dotnet publish WinUI3Shell/WinUI3Shell.csproj -c Release -p:Platform=x64 -p:SelfContained=true -p:WindowsAppSDKSelfContained=true
+```
+
+打包完成后：
+
+1. 产物在 `WinUI3Shell\bin\x64\Release\net8.0-windows10.0.19041.0\win-x64\publish\`，约 200 MB
+2. 把整个 publish 文件夹压缩成 zip 即可分发，约 80 MB。别只拷 exe，里面的 dll 都是运行必需的
+3. 对方解压后双击 `MnyMinecraftLauncher.exe` 就能用
+
+> 说明：csproj 里已内置 CopyXamlArtifactsToPublish 目标，发布时自动补齐 XAML 编译产物，所以上面的命令不需要任何额外步骤，也不会出现发布版闪退的问题。
 
 ## 目录结构
 
