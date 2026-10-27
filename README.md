@@ -1,5 +1,7 @@
 # MnyMinecraftLauncher
 
+新版本安装时需要卸载旧版本
+
 ###### *AI写的README凑合看吧*
 
 一个基于 **WinUI 3 / .NET 8** 的现代化 Minecraft Java 版第三方启动器（Windows x64），支持原版与主流模组加载器的一键安装、多版本管理和离线登录。
