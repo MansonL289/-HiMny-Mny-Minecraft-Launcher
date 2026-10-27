@@ -12,13 +12,22 @@ public sealed partial class VersionSettingsPage : Page
     public string Dir { get; private set; }
     public VersionMeta Meta { get; }
 
-    public VersionSettingsPage(string dir)
+    public VersionSettingsPage(string dir, string? section = null)
     {
         InitializeComponent();
         Dir = dir;
         Meta = VersionMeta.Load(dir) ?? new VersionMeta { Id = dir };
         TitleText.Text = $"{dir} - {Meta.Id}";
-        SubFrame.Navigate(typeof(VersionGeneralPage), this);
+        Navigate(section ?? "general");
+        // 让侧栏高亮同步到实际显示的子页
+        foreach (var obj in SideBar.MenuItems)
+        {
+            if (obj is NavigationViewItem item && item.Tag as string == (section ?? "general"))
+            {
+                SideBar.SelectedItem = item;
+                break;
+            }
+        }
     }
 
     public void SaveMeta() => Meta.Save(Dir);
@@ -49,6 +58,7 @@ public sealed partial class VersionSettingsPage : Page
         Type? page = tag switch
         {
             "launch" => typeof(VersionLaunchSettingsPage),
+            "saves" => typeof(VersionSavesPage),
             "mods" => typeof(VersionModsPage),
             _ => typeof(VersionGeneralPage),
         };

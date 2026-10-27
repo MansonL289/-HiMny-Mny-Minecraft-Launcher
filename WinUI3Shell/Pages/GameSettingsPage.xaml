@@ -113,6 +113,21 @@
                     SelectionChanged="LanguageBox_SelectionChanged" />
             </StackPanel>
 
+            <StackPanel Spacing="8">
+                <TextBlock Text="版本隔离" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                <ComboBox
+                    x:Name="IsolationBox"
+                    Width="360"
+                    HorizontalAlignment="Left"
+                    SelectionChanged="IsolationBox_SelectionChanged">
+                    <ComboBoxItem Content="关闭" Tag="off" />
+                    <ComboBoxItem Content="隔离可安装 Mod 的版本" Tag="modded" />
+                    <ComboBoxItem Content="隔离非正式版" Tag="unofficial" />
+                    <ComboBoxItem Content="隔离可安装 Mod 的版本与非正式版" Tag="modded_unofficial" />
+                    <ComboBoxItem Content="隔离所有版本" Tag="all" />
+                </ComboBox>
+            </StackPanel>
+
         </StackPanel>
     </ScrollViewer>
 </Page>

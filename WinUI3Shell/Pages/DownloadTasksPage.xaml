@@ -77,7 +77,7 @@
                     FontSize="12"
                     Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                     HorizontalAlignment="Center"
-                    Text="在「游戏版本」里选择一个版本开始下载" />
+                    Text="在「游戏版本」或「MOD」里开始下载" />
             </StackPanel>
         </Grid>
     </Grid>

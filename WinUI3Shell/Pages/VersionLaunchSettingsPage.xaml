@@ -8,10 +8,16 @@
         <StackPanel MaxWidth="560" Padding="20,20,20,24" Spacing="12">
             <!-- 启动 -->
             <TextBlock Style="{StaticResource BodyStrongTextBlockStyle}" Text="启动" />
-            <ToggleSwitch
-                x:Name="IsolationToggle"
-                Header="版本隔离（存档、Mod、截图等存在版本目录下）"
-                Toggled="Setting_Changed" />
+            <ComboBox
+                x:Name="IsolationCombo"
+                Width="340"
+                Header="版本隔离"
+                HorizontalAlignment="Left"
+                SelectionChanged="Setting_Changed">
+                <ComboBoxItem Content="跟随全局设置" Tag="global" />
+                <ComboBoxItem Content="隔离" Tag="on" />
+                <ComboBoxItem Content="不隔离" Tag="off" />
+            </ComboBox>
             <ComboBox
                 x:Name="JavaCombo"
                 Width="240"

@@ -12,6 +12,8 @@ public sealed partial class VersionDetailPage : Page
     public sealed record LoaderVersionOption(string Display, string? Version);
 
     private string _versionId = "";
+    /// <summary>当前自动生成的版本名；用户手动改过后不再覆盖。</summary>
+    private string _autoName = "";
     /// <summary>版本列表拉取序号：快速切换加载器时丢弃过期结果。</summary>
     private int _versionLoadSeq;
     /// <summary>上一次拉取的取消令牌：切换加载器时取消，且限制最长等待 20 秒。</summary>
@@ -28,9 +30,39 @@ public sealed partial class VersionDetailPage : Page
     {
         _versionId = e.Parameter as string ?? "";
         TitleText.Text = _versionId;
-        VersionNameBox.Text = _versionId; // 默认版本名 = 版本号
+        UpdateAutoName(force: true); // 默认版本名 = 版本-安装器
         _ = CheckLoaderSupportAsync(); // 后台检测各加载器是否支持此版本，不支持的灰置
     }
+
+    /// <summary>加载器选项对应的名称后缀（不安装为空）。</summary>
+    private static string LoaderName(int index) => index switch
+    {
+        1 => "Fabric",
+        2 => "Forge",
+        3 => "NeoForge",
+        _ => "",
+    };
+
+    /// <summary>生成「版本-安装器」名称；重名时依次追加 -2、-3…。
+    /// 用户手动改过名字后不再自动覆盖，除非 force。</summary>
+    private void UpdateAutoName(bool force = false)
+    {
+        if (_versionId.Length == 0) return;
+        if (!force && VersionNameBox.Text.Length > 0 && VersionNameBox.Text != _autoName) return;
+
+        string loader = LoaderName(LoaderRadio.SelectedIndex);
+        string baseName = loader.Length == 0 ? _versionId : $"{_versionId}-{loader}";
+        string name = baseName;
+        for (int i = 2; IsNameTaken(name); i++)
+        {
+            name = $"{baseName}-{i}";
+        }
+        _autoName = name;
+        VersionNameBox.Text = name;
+    }
+
+    private static bool IsNameTaken(string name) =>
+        System.IO.Directory.Exists(VersionMeta.DirPath(name)) || DownloadManager.IsNameOrVersionBusy(name, "");
 
     /// <summary>并行拉取三种加载器的构建列表：空列表 = 不支持该 MC 版本，禁用对应选项。</summary>
     private async System.Threading.Tasks.Task CheckLoaderSupportAsync()
@@ -75,6 +107,7 @@ public sealed partial class VersionDetailPage : Page
     private async void LoaderRadio_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         int idx = LoaderRadio.SelectedIndex;
+        UpdateAutoName(); // 名称跟随安装器（用户手动改过则不覆盖）
         bool show = idx > 0;
         LoaderVersionCombo.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         LoaderVersionStatus.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
@@ -171,6 +204,7 @@ public sealed partial class VersionDetailPage : Page
             : (LoaderVersionCombo.SelectedItem as LoaderVersionOption)?.Version;
 
         DownloadManager.Start(_versionId, name, AppSettings.DownloadMirror, addon, loaderVersion);
-        StatusText.Text = "已加入后台下载，可在左侧「下载任务」查看进度。";
+        // 加入后台下载后回到下载页的「下载任务」
+        App.MainWindow?.ShowDownloadTasks();
     }
 }

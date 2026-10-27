@@ -26,7 +26,7 @@ public static class ForgeInstaller
             {
                 return loaderVersion;
             }
-            if (m == Mirror.Bmclapi)
+            if (Mirror.PrefersBmclapi(m))
             {
                 try
                 {
@@ -73,7 +73,7 @@ public static class ForgeInstaller
             }
             string prefix = legacy ? "47.1." : NeoForgePrefix(mcVersion);
             string rel = $"net/neoforged/{artifact}/maven-metadata.xml";
-            var urls = m == Mirror.Bmclapi
+            var urls = Mirror.PrefersBmclapi(m)
                 ? new[] { $"https://bmclapi2.bangbang93.com/maven/{rel}", $"https://maven.neoforged.net/releases/{rel}" }
                 : new[] { $"https://maven.neoforged.net/releases/{rel}", $"https://bmclapi2.bangbang93.com/maven/{rel}" };
             string? xml = await TryGetStringAsync(urls, ct);
@@ -502,7 +502,7 @@ public static class ForgeInstaller
             "https://repo.maven.apache.org/maven2/" + rel,
             "https://libraries.minecraft.net/" + rel,
         };
-        return mirror == Mirror.Bmclapi
+        return Mirror.PrefersBmclapi(mirror)
             ? new[] { bmcl }.Concat(official)
             : official.Append(bmcl);
     }

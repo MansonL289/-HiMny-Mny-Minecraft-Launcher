@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
@@ -15,16 +16,29 @@ public static class McPaths
     public static string LibrariesDir => Path.Combine(GameDir, "libraries");
     public static string AssetsDir => Path.Combine(GameDir, "assets");
     public static string RuntimesDir => Path.Combine(GameDir, "runtimes");
+    /// <summary>MOD 库：下载的 Mod 文件仓库（与具体版本无关）。</summary>
+    public static string ModLibraryDir => Path.Combine(GameDir, "modlibrary");
 }
 
 /// <summary>下载进度：阶段名、字节进度、文件数进度。</summary>
 public sealed record McProgress(string Phase, long DoneBytes, long TotalBytes, int DoneFiles, int TotalFiles);
 
-/// <summary>镜像源：官方 / BMCLAPI，按域名重写 URL。</summary>
+/// <summary>镜像源：官方 / BMCLAPI；auto = 断点换源（先走镜像，失败自动切官方并续传）。</summary>
 public static class Mirror
 {
     public const string Official = "official";
     public const string Bmclapi = "bmclapi";
+    public const string Auto = "auto";
+
+    /// <summary>断点换源时，记录「镜像地址 → 官方原始地址」，供失败重试切源用。</summary>
+    private static readonly ConcurrentDictionary<string, string> AutoOriginals = new();
+
+    /// <summary>是否优先走 BMCLAPI 镜像（断点换源也优先镜像）。</summary>
+    public static bool PrefersBmclapi(string mirror) => mirror != Official;
+
+    /// <summary>断点换源模式下取回原始官方地址；返回 false 表示无需切源。</summary>
+    public static bool TryGetOriginal(string url, out string original) =>
+        AutoOriginals.TryGetValue(url, out original!);
 
     private static readonly Dictionary<string, Dictionary<string, string>> HostRewrites = new()
     {
@@ -45,7 +59,9 @@ public static class Mirror
 
     public static string Rewrite(string url, string mirror = Official)
     {
-        if (!HostRewrites.TryGetValue(mirror, out var rules) || rules.Count == 0)
+        // 断点换源先按 BMCLAPI 改写，同时记住官方地址，下载失败时可切回
+        string rulesKey = mirror == Auto ? Bmclapi : mirror;
+        if (!HostRewrites.TryGetValue(rulesKey, out var rules) || rules.Count == 0)
             return url;
         var uri = new Uri(url);
         if (!rules.TryGetValue(uri.Host, out var target))
@@ -70,7 +86,13 @@ public static class Mirror
         {
             host = target;
         }
-        return $"{uri.Scheme}://{host}{path}{uri.Query}";
+        string rewritten = $"{uri.Scheme}://{host}{path}{uri.Query}";
+        if (mirror == Auto && rewritten != url)
+        {
+            if (AutoOriginals.Count > 20000) AutoOriginals.Clear();
+            AutoOriginals[rewritten] = url;
+        }
+        return rewritten;
     }
 }
 
@@ -131,26 +153,24 @@ public static class Downloader
         if (IsValid(t)) return;
         Directory.CreateDirectory(Path.GetDirectoryName(t.Dest)!);
         string tmp = t.Dest + ".part";
+        // 断点换源：镜像失败后切官方地址，并从已下载的部分继续
+        bool canSwitch = Mirror.TryGetOriginal(t.Url, out string fallbackUrl);
         Exception? last = null;
         for (int attempt = 1; attempt <= Retries + 1; attempt++)
         {
+            string url = canSwitch && attempt % 2 == 0 ? fallbackUrl : t.Url;
             try
             {
-                using var resp = await McHttp.Client.GetAsync(t.Url, HttpCompletionOption.ResponseHeadersRead, ct);
-                resp.EnsureSuccessStatusCode();
-                await using (var input = await resp.Content.ReadAsStreamAsync(ct))
-                await using (var output = File.Create(tmp))
+                // 半成品已达到或超过目标大小，说明文件坏了，直接重来
+                if (canSwitch && t.Size is long fullSize
+                    && File.Exists(tmp) && new FileInfo(tmp).Length >= fullSize)
                 {
-                    var buffer = new byte[1 << 16];
-                    int n;
-                    while ((n = await input.ReadAsync(buffer, ct)) > 0)
-                    {
-                        await output.WriteAsync(buffer.AsMemory(0, n), ct);
-                        onChunk?.Invoke(n);
-                    }
+                    TryDelete(tmp);
                 }
+                await DownloadToAsync(url, tmp, canSwitch, onChunk, ct);
                 File.Move(tmp, t.Dest, true);
                 if (IsValid(t)) return;
+                TryDelete(t.Dest);
                 last = new InvalidDataException($"sha1/size 校验失败: {t.Url}");
             }
             catch (OperationCanceledException)
@@ -160,11 +180,41 @@ public static class Downloader
             }
             catch (Exception ex)
             {
-                TryDelete(tmp);
+                if (!canSwitch) TryDelete(tmp);
                 last = ex;
             }
         }
         throw new HttpRequestException($"下载失败（重试 {Retries} 次后仍不成功）: {t.Url}", last);
+    }
+
+    /// <summary>写入 .part；append=true 时带 Range 从断点续传，服务器不支持则从头开始。</summary>
+    private static async Task DownloadToAsync(string url, string tmp, bool append,
+        Action<long>? onChunk, CancellationToken ct)
+    {
+        long existing = append && File.Exists(tmp) ? new FileInfo(tmp).Length : 0;
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+        if (existing > 0)
+        {
+            req.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(existing, null);
+        }
+        using var resp = await McHttp.Client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+        bool resumed = existing > 0 && resp.StatusCode == HttpStatusCode.PartialContent;
+        if (!resumed)
+        {
+            resp.EnsureSuccessStatusCode();
+        }
+        await using (var input = await resp.Content.ReadAsStreamAsync(ct))
+        await using (var output = new FileStream(tmp,
+            resumed ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16, true))
+        {
+            var buffer = new byte[1 << 16];
+            int n;
+            while ((n = await input.ReadAsync(buffer, ct)) > 0)
+            {
+                await output.WriteAsync(buffer.AsMemory(0, n), ct);
+                onChunk?.Invoke(n);
+            }
+        }
     }
 
     private static void TryDelete(string path)

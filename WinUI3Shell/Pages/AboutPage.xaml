@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinUI3Shell.Pages.AboutPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ScrollViewer>
+        <StackPanel Spacing="20" MaxWidth="620" HorizontalAlignment="Left">
+            <StackPanel Spacing="4">
+                <TextBlock Text="MnyMinecraftLauncher Beta" Style="{StaticResource SubtitleTextBlockStyle}" />
+                <TextBlock
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="版本号 Beta_1.1.20261027" />
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+                <TextBlock Text="反馈与意见" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                <HyperlinkButton
+                    Padding="0"
+                    Content="https://github.com/MansonL289/HiMny-MnyMinecraftLauncher/issues"
+                    NavigateUri="https://github.com/MansonL289/HiMny-MnyMinecraftLauncher/issues" />
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+                <TextBlock Text="更新最新版" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                <HyperlinkButton
+                    Padding="0"
+                    Content="https://github.com/MansonL289/HiMny-MnyMinecraftLauncher/tags"
+                    NavigateUri="https://github.com/MansonL289/HiMny-MnyMinecraftLauncher/tags" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

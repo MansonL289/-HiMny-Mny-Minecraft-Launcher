@@ -22,6 +22,8 @@
                 <NavigationViewItem Content="Forge" Tag="forge" />
                 <NavigationViewItem Content="Fabric" Tag="fabric" />
                 <NavigationViewItem Content="NeoForge" Tag="neoforge" />
+                <NavigationViewItemSeparator />
+                <NavigationViewItem Content="MOD" Tag="mods" />
             </NavigationView.MenuItems>
             <NavigationView.FooterMenuItems>
                 <NavigationViewItem Content="下载任务" Tag="tasks">

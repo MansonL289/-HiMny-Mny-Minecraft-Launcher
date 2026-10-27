@@ -19,9 +19,17 @@ public sealed class DownloadJob
     /// <summary>手动指定的加载器版本号；空则自动选最新。</summary>
     public string? LoaderVersion { get; init; }
     public required CancellationTokenSource Cts { get; init; }
+    /// <summary>任务开始时版本目录是否为本次新建（失败/取消时据此清理残留）。</summary>
+    public bool CreatedDir { get; init; }
     public string StatusText { get; set; } = "排队中...";
     public bool Done { get; set; }
     public string? Error { get; set; }
+    /// <summary>是否被用户取消。</summary>
+    public bool Cancelled { get; set; }
+    /// <summary>MOD 入库下载任务：VersionId 存 Mod 标题，InstallName 为空。</summary>
+    public bool IsMod { get; init; }
+    /// <summary>进度 0~1（MOD 任务用，版本任务看 StatusText 里的文件计数）。</summary>
+    public double Fraction { get; set; }
     /// <summary>加载器后缀显示文本（如 " + Forge"）。</summary>
     public string AddonText => Addon switch
     {
@@ -51,6 +59,12 @@ public static class DownloadManager
         lock (Gate) return JobsList.Any(j => !j.Done && j.VersionId == versionId);
     }
 
+    /// <summary>同一个 Mod 是否已有入库/安装任务在跑（避免重复点下载生成两个任务）。</summary>
+    public static bool IsModBusy(string title)
+    {
+        lock (Gate) return JobsList.Any(j => !j.Done && j.IsMod && j.VersionId == title);
+    }
+
     /// <summary>是否有同名（版本名）或同版本的活跃任务。</summary>
     public static bool IsNameOrVersionBusy(string installName, string versionId)
     {
@@ -75,6 +89,7 @@ public static class DownloadManager
             Addon = addon,
             LoaderVersion = loaderVersion,
             Cts = new CancellationTokenSource(),
+            CreatedDir = !Directory.Exists(VersionMeta.DirPath(installName)),
         };
         // 先写元数据，启动页立即可见（下载中置灰）
         new VersionMeta { Id = versionId }.Save(installName);
@@ -82,6 +97,54 @@ public static class DownloadManager
         JobsChanged?.Invoke(null, EventArgs.Empty);
         _ = Task.Run(() => RunJobAsync(job, mirror));
         return job;
+    }
+
+    /// <summary>启动一个 MOD 入库下载任务：与版本任务一样出现在下载任务页和标题栏指示器。</summary>
+    /// <param name="title">Mod 名（显示用）。</param>
+    /// <param name="body">任务体；内部用 <see cref="Report"/> 更新进度。</param>
+    public static DownloadJob StartMod(string title, Func<DownloadJob, CancellationToken, Task> body)
+    {
+        var job = new DownloadJob
+        {
+            VersionId = title,
+            InstallName = "",
+            Addon = McAddon.None,
+            IsMod = true,
+            Cts = new CancellationTokenSource(),
+        };
+        lock (Gate) JobsList.Add(job);
+        JobsChanged?.Invoke(null, EventArgs.Empty);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await body(job, job.Cts.Token);
+                job.Done = true;
+                job.Fraction = 1;
+            }
+            catch (OperationCanceledException)
+            {
+                job.Done = true;
+                job.Cancelled = true;
+                job.StatusText = "已取消";
+            }
+            catch (Exception ex)
+            {
+                job.Done = true;
+                job.Error = ex.Message;
+                job.StatusText = $"失败: {ex.Message}";
+            }
+            JobsChanged?.Invoke(null, EventArgs.Empty);
+        });
+        return job;
+    }
+
+    /// <summary>任务体内更新进度（任意线程可调用）。</summary>
+    public static void Report(DownloadJob job, string status, double fraction)
+    {
+        job.StatusText = status;
+        job.Fraction = fraction;
+        JobsChanged?.Invoke(null, EventArgs.Empty);
     }
 
     private static async Task RunJobAsync(DownloadJob job, string mirror)
@@ -116,18 +179,37 @@ public static class DownloadManager
 
             job.Done = true;
             job.StatusText = "下载完成";
+            GameLanguages.Invalidate(); // 新版本带来新的语言列表
         }
         catch (OperationCanceledException)
         {
+            CleanupFailedInstall(job);
             job.Done = true;
+            job.Cancelled = true;
             job.StatusText = "已取消";
         }
         catch (Exception ex)
         {
+            CleanupFailedInstall(job);
             job.Done = true;
             job.Error = ex.Message;
-            job.StatusText = $"失败: {ex.Message}（重新开始可断点续传）";
+            job.StatusText = $"失败: {ex.Message}";
         }
         JobsChanged?.Invoke(null, EventArgs.Empty);
+    }
+
+    /// <summary>失败/取消时删除本次新建的版本目录，避免启动页出现装了一半的版本。</summary>
+    private static void CleanupFailedInstall(DownloadJob job)
+    {
+        if (!job.CreatedDir) return;
+        try
+        {
+            string dir = VersionMeta.DirPath(job.InstallName);
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+        catch { /* 删不掉就留着，下次下载会覆盖 */ }
     }
 }

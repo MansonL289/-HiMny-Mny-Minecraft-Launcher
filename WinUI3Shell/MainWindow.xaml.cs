@@ -19,7 +19,7 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
 
-        Title = "MnyMC";
+        Title = "MnyLauncher";
         SystemBackdrop = new MicaBackdrop();
         // 启动器自身窗口：屏幕工作区的 5/12 大小并居中（与“游戏窗口大小”设置无关）
         var workArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
@@ -56,10 +56,10 @@ public sealed partial class MainWindow : Window
     /// <summary>窗口句柄，供文件选择器等 Win32 互操作使用。</summary>
     public IntPtr Hwnd => WinRT.Interop.WindowNative.GetWindowHandle(this);
 
-    /// <summary>打开指定版本的版本设置页（不进页面缓存，每次新建）。</summary>
-    public void ShowVersionSettings(string versionDir)
+    /// <summary>打开指定版本的版本设置页（不进页面缓存，每次新建）；section 可直达子页。</summary>
+    public void ShowVersionSettings(string versionDir, string? section = null)
     {
-        ContentFrame.Content = new VersionSettingsPage(versionDir);
+        ContentFrame.Content = new VersionSettingsPage(versionDir, section);
     }
 
     /// <summary>从版本设置返回启动页（恢复缓存的页面实例，保留状态）。</summary>
@@ -90,7 +90,10 @@ public sealed partial class MainWindow : Window
     }
 
     // 点击标题栏下载按钮：跳到下载页并直达「下载任务」
-    private void DlIndicator_Click(object sender, RoutedEventArgs e)
+    private void DlIndicator_Click(object sender, RoutedEventArgs e) => ShowDownloadTasks();
+
+    /// <summary>跳到下载页并切到「下载任务」（下载开始后返回用）。</summary>
+    public void ShowDownloadTasks()
     {
         foreach (var obj in NavView.MenuItems)
         {
@@ -155,6 +158,7 @@ public sealed partial class MainWindow : Window
             page = tag switch
             {
                 "Download.Vanilla" => new DownloadsPage(),
+                "Mod.Library" => new ModLibraryPage(),
                 "Settings" => new SettingsPage(),
                 _ => new HomePage(),
             };

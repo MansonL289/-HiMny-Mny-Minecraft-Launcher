@@ -12,7 +12,15 @@ public sealed partial class DownloadSettingsPage : Page
         InitializeComponent();
 
         _initializing = true;
-        MirrorBox.SelectedIndex = AppSettings.DownloadMirror == Services.Mc.Mirror.Official ? 1 : 0;
+        string current = AppSettings.DownloadMirror;
+        for (int i = 0; i < MirrorBox.Items.Count; i++)
+        {
+            if (MirrorBox.Items[i] is ComboBoxItem item && item.Tag as string == current)
+            {
+                MirrorBox.SelectedIndex = i;
+                break;
+            }
+        }
         _initializing = false;
     }
 
@@ -23,6 +31,6 @@ public sealed partial class DownloadSettingsPage : Page
             return;
         }
 
-        AppSettings.DownloadMirror = item.Tag?.ToString() ?? Services.Mc.Mirror.Bmclapi;
+        AppSettings.DownloadMirror = item.Tag?.ToString() ?? Services.Mc.Mirror.Auto;
     }
 }

@@ -32,6 +32,7 @@
             <NavigationView.MenuItems>
                 <NavigationViewItem Content="常规" Tag="general" Margin="0,8,0,0" IsSelected="True" />
                 <NavigationViewItem Content="设置" Tag="launch" />
+                <NavigationViewItem Content="存档" Tag="saves" />
                 <NavigationViewItem Content="Mod 管理" Tag="mods" />
             </NavigationView.MenuItems>
             <Frame x:Name="SubFrame">

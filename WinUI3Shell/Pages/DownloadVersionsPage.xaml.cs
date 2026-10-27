@@ -54,7 +54,9 @@ public sealed partial class DownloadVersionsPage : Page
     {
         _refreshing = true;
         RefreshButton.IsEnabled = false;
-        DlStatus.Text = "正在获取版本清单...";
+        VersionList.IsEnabled = false;
+        LoadingRing.Visibility = Visibility.Visible;
+        DlStatus.Text = "";
         try
         {
             JsonObject manifest;
@@ -77,6 +79,8 @@ public sealed partial class DownloadVersionsPage : Page
         finally
         {
             _refreshing = false;
+            LoadingRing.Visibility = Visibility.Collapsed;
+            VersionList.IsEnabled = true;
             RefreshButton.IsEnabled = true;
         }
     }

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinUI3Shell.Pages.StorageSavesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid RowDefinitions="Auto,Auto,*" RowSpacing="12">
+        <TextBlock
+            x:Name="TitleText"
+            Style="{StaticResource BodyStrongTextBlockStyle}" />
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12">
+            <Button Click="SelectAll_Click" Content="全选" />
+            <Button
+                x:Name="DeleteButton"
+                Click="DeleteSelected_Click"
+                Content="删除所选"
+                Foreground="#FF6363"
+                IsEnabled="False" />
+            <TextBlock
+                x:Name="StatusText"
+                VerticalAlignment="Center"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+
+        <Grid Grid.Row="2">
+            <ListView x:Name="SaveList">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <CheckBox
+                                IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                                Tag="{Binding SavePath}"
+                                VerticalAlignment="Center"
+                                Checked="SaveCheck_Changed"
+                                Unchecked="SaveCheck_Changed" />
+                            <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                <TextBlock FontWeight="SemiBold" Text="{Binding LevelName}" />
+                                <TextBlock
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="{Binding DetailText}" />
+                            </StackPanel>
+                            <TextBlock
+                                Grid.Column="2"
+                                Margin="12,0,0,0"
+                                VerticalAlignment="Center"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="{Binding SizeText}" />
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+            <TextBlock
+                x:Name="EmptyText"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="这个版本还没有存档"
+                Visibility="Collapsed" />
+        </Grid>
+    </Grid>
+</Page>

@@ -3,7 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 
 namespace WinUI3Shell.Pages;
 
-/// <summary>下载页外壳：左侧栏（游戏版本 / Forge / Fabric / NeoForge / 下载任务）+ 右侧子页面。</summary>
+/// <summary>下载页外壳：左侧栏（游戏版本 / Forge / Fabric / NeoForge / MOD / 下载任务）+ 右侧子页面。</summary>
 public sealed partial class DownloadsPage : Page
 {
     public DownloadsPage()
@@ -52,6 +52,16 @@ public sealed partial class DownloadsPage : Page
                 if (DlFrame.CurrentSourcePageType != typeof(DownloadTasksPage))
                 {
                     DlFrame.Navigate(typeof(DownloadTasksPage));
+                }
+                break;
+            case "mods":
+                if (DlFrame.CurrentSourcePageType == typeof(ModDetailPage) && DlFrame.CanGoBack)
+                {
+                    DlFrame.GoBack();
+                }
+                else if (DlFrame.CurrentSourcePageType != typeof(ModSearchPage))
+                {
+                    DlFrame.Navigate(typeof(ModSearchPage));
                 }
                 break;
             default:

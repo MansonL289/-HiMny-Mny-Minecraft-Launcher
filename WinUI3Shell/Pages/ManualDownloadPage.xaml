@@ -23,10 +23,18 @@
                 SelectionChanged="McVersionCombo_SelectionChanged" />
         </StackPanel>
 
-        <ListView
-            x:Name="BuildList"
-            Grid.Row="2"
-            SelectionChanged="BuildList_SelectionChanged" />
+        <Grid Grid.Row="2">
+            <ListView
+                x:Name="BuildList"
+                SelectionChanged="BuildList_SelectionChanged" />
+            <ProgressRing
+                x:Name="LoadingRing"
+                Width="36"
+                Height="36"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Visibility="Collapsed" />
+        </Grid>
 
         <StackPanel
             Grid.Row="3"

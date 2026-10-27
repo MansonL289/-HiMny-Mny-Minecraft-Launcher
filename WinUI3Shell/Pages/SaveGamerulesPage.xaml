@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinUI3Shell.Pages.SaveGamerulesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Padding="4,0,4,0" RowDefinitions="Auto,*">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button
+                AutomationProperties.Name="返回"
+                ToolTipService.ToolTip="返回"
+                Click="Back_Click">
+                <SymbolIcon Symbol="Back" />
+            </Button>
+            <TextBlock
+                x:Name="TitleText"
+                VerticalAlignment="Center"
+                Style="{StaticResource BodyStrongTextBlockStyle}" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" Margin="0,8,0,0">
+            <StackPanel x:Name="RulesPanel" Spacing="2" />
+        </ScrollViewer>
+    </Grid>
+</Page>

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
@@ -6,6 +7,8 @@ using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
+using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage;
 using Windows.Storage.Pickers;
 using WinUI3Shell.Services.Mc;
 
@@ -19,7 +22,8 @@ public sealed class ModItem
     /// <summary>显示名（不含 .disabled 后缀）。</summary>
     public string Name { get; set; } = "";
     public bool IsEnabled { get; set; }
-    public string SizeText { get; set; } = "";
+    /// <summary>大小，若有 mods.json 记录再附带加载器与版本。</summary>
+    public string DetailText { get; set; } = "";
 }
 
 /// <summary>版本设置 - Mod 管理：每行一个开关（启用/禁用）+ 删除按钮，
@@ -28,6 +32,8 @@ public sealed partial class VersionModsPage : Page
 {
     private VersionSettingsPage? _shell;
     private readonly ObservableCollection<ModItem> _mods = new();
+    /// <summary>当前版本的加载器显示文本（空 = 原版，不允许装 Mod）。</summary>
+    private string _loader = "";
 
     public VersionModsPage()
     {
@@ -45,11 +51,19 @@ public sealed partial class VersionModsPage : Page
 
     private VersionSettingsPage Shell => _shell!;
     private string ModsDir => Path.Combine(Shell.Meta.GameDir(Shell.Dir), "mods");
+    private string LoaderKind => Shell.Meta.LoaderType(Shell.Dir);
 
     private void RefreshList()
     {
         _mods.Clear();
-        // .jar = 启用，.jar.disabled = 禁用
+        _loader = Shell.Meta.DetectLoader(Shell.Dir);
+        bool hasLoader = _loader.Length > 0;
+        InstallModsButton.IsEnabled = hasLoader;
+        LoaderWarning.Visibility = hasLoader ? Visibility.Collapsed : Visibility.Visible;
+
+        // .jar = 启用，.jar.disabled = 禁用；mods.json 补充加载器与版本信息
+        var records = ModRegistry.Load(ModsDir)
+            .ToDictionary(r => BareName(r.File), r => r, StringComparer.OrdinalIgnoreCase);
         var files = Directory.Exists(ModsDir)
             ? Directory.GetFiles(ModsDir, "*.jar")
                 .Concat(Directory.GetFiles(ModsDir, "*.jar.disabled"))
@@ -65,12 +79,18 @@ public sealed partial class VersionModsPage : Page
                 name = name[..^".disabled".Length];
             }
             long len = new FileInfo(file).Length;
+            string size = len >= 1024 * 1024 ? $"{len / 1048576.0:0.#} MB" : $"{len / 1024.0:0.#} KB";
+            string detail = size;
+            if (records.TryGetValue(name, out var record))
+            {
+                detail = $"{LoaderName(record.Loader)} · {record.McVersion} · {size}";
+            }
             _mods.Add(new ModItem
             {
                 FilePath = file,
                 Name = name,
                 IsEnabled = !disabled,
-                SizeText = len >= 1024 * 1024 ? $"{len / 1048576.0:0.#} MB" : $"{len / 1024.0:0.#} KB",
+                DetailText = detail,
             });
         }
         bool empty = _mods.Count == 0;
@@ -78,6 +98,21 @@ public sealed partial class VersionModsPage : Page
         ModList.Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
         UpdateStatus();
     }
+
+    private static string BareName(string fileName) =>
+        fileName.EndsWith(".disabled", StringComparison.OrdinalIgnoreCase)
+            ? fileName[..^".disabled".Length]
+            : fileName;
+
+    private static string LoaderName(string kind) => kind switch
+    {
+        "fabric" => "Fabric",
+        "forge" => "Forge",
+        "neoforge" => "NeoForge",
+        "quilt" => "Quilt",
+        "" => "原版",
+        _ => kind,
+    };
 
     private void UpdateStatus(string? extra = null)
     {
@@ -96,6 +131,11 @@ public sealed partial class VersionModsPage : Page
 
     private async void InstallMods_Click(object sender, RoutedEventArgs e)
     {
+        if (_loader.Length == 0)
+        {
+            UpdateStatus("当前版本未安装加载器，无法安装 Mod");
+            return;
+        }
         var picker = new FileOpenPicker();
         picker.FileTypeFilter.Add(".jar");
         WinRT.Interop.InitializeWithWindow.Initialize(picker, App.MainWindow!.Hwnd);
@@ -104,9 +144,60 @@ public sealed partial class VersionModsPage : Page
         Directory.CreateDirectory(ModsDir);
         foreach (var file in files)
         {
-            File.Copy(file.Path, Path.Combine(ModsDir, file.Name), true);
+            string dest = Path.Combine(ModsDir, file.Name);
+            File.Copy(file.Path, dest, true);
+            RegisterLocal(dest);
         }
         RefreshList();
+    }
+
+    /// <summary>把本地导入的 jar 也登记进 mods.json（没有元数据，用当前实例信息）。</summary>
+    private void RegisterLocal(string path)
+    {
+        string fileName = Path.GetFileName(path);
+        ModRegistry.Upsert(ModsDir, new ModRecord
+        {
+            Id = "local@" + BareName(fileName),
+            Name = BareName(fileName)[..^".jar".Length],
+            Loader = LoaderKind,
+            McVersion = Shell.Meta.McVersion(Shell.Dir),
+            File = fileName,
+            Enabled = true,
+        });
+    }
+
+    /// <summary>拖拽 .jar 到页面即导入。</summary>
+    private void Page_DragOver(object sender, DragEventArgs e)
+    {
+        if (e.DataView.Contains(StandardDataFormats.StorageItems))
+        {
+            e.AcceptedOperation = DataPackageOperation.Copy;
+        }
+    }
+
+    private async void Page_Drop(object sender, DragEventArgs e)
+    {
+        if (_loader.Length == 0)
+        {
+            UpdateStatus("当前版本未安装加载器，无法导入 Mod");
+            return;
+        }
+        if (!e.DataView.Contains(StandardDataFormats.StorageItems)) return;
+        var items = await e.DataView.GetStorageItemsAsync();
+        Directory.CreateDirectory(ModsDir);
+        int count = 0;
+        foreach (var item in items)
+        {
+            if (item is StorageFile file && file.FileType.Equals(".jar", StringComparison.OrdinalIgnoreCase))
+            {
+                string dest = Path.Combine(ModsDir, file.Name);
+                File.Copy(file.Path, dest, true);
+                RegisterLocal(dest);
+                count++;
+            }
+        }
+        RefreshList();
+        UpdateStatus(count == 0 ? "没有可导入的 .jar 文件" : $"已导入 {count} 个");
     }
 
     private void ModToggle_Toggled(object sender, RoutedEventArgs e)
@@ -114,14 +205,16 @@ public sealed partial class VersionModsPage : Page
         if (sender is not ToggleSwitch ts || ts.Tag is not ModItem item) return;
         if (ts.IsOn == item.IsEnabled) return; // 绑定初始化触发的，无需处理
 
+        string oldPath = item.FilePath;
         string target = ts.IsOn
-            ? item.FilePath[..^".disabled".Length]
-            : item.FilePath + ".disabled";
+            ? oldPath[..^".disabled".Length]
+            : oldPath + ".disabled";
         try
         {
-            File.Move(item.FilePath, target);
+            File.Move(oldPath, target);
             item.FilePath = target;
             item.IsEnabled = ts.IsOn;
+            ModRegistry.SetEnabled(ModsDir, Path.GetFileName(oldPath), Path.GetFileName(target), ts.IsOn);
             UpdateStatus();
         }
         catch (Exception ex)
@@ -137,6 +230,7 @@ public sealed partial class VersionModsPage : Page
         try
         {
             File.Delete(item.FilePath);
+            ModRegistry.Remove(ModsDir, Path.GetFileName(item.FilePath));
         }
         catch (Exception ex)
         {

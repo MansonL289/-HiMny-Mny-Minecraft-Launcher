@@ -4,10 +4,16 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <Grid Padding="20,20,20,12" RowDefinitions="Auto,*,Auto">
+    <Grid
+        Padding="20,20,20,12"
+        AllowDrop="True"
+        DragOver="Page_DragOver"
+        Drop="Page_Drop"
+        RowDefinitions="Auto,Auto,*,Auto">
         <!-- 工具栏 -->
         <StackPanel Orientation="Horizontal" Spacing="8">
             <Button
+                x:Name="InstallModsButton"
                 Click="InstallMods_Click"
                 Style="{StaticResource AccentButtonStyle}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
@@ -24,8 +30,19 @@
             </Button>
         </StackPanel>
 
+        <!-- 未安装加载器提示：原版不读取 mods 目录 -->
+        <TextBlock
+            x:Name="LoaderWarning"
+            Grid.Row="1"
+            Margin="0,10,0,0"
+            FontSize="12"
+            Foreground="#E8A33D"
+            TextWrapping="Wrap"
+            Visibility="Collapsed"
+            Text="当前版本未安装 Mod 加载器（Forge / NeoForge / Fabric），原版游戏不会加载 Mod。请安装带加载器的版本后再使用。" />
+
         <!-- Mod 列表 + 空状态提示 -->
-        <Grid Grid.Row="1" Margin="0,12,0,0">
+        <Grid Grid.Row="2" Margin="0,12,0,0">
             <ListView
                 x:Name="ModList"
                 ItemsSource="{x:Bind Mods}"
@@ -54,7 +71,7 @@
                                 <TextBlock
                                     FontSize="12"
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="{Binding SizeText}" />
+                                    Text="{Binding DetailText}" />
                             </StackPanel>
                             <Button
                                 Grid.Column="2"
@@ -86,14 +103,14 @@
                     FontSize="12"
                     Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                     HorizontalAlignment="Center"
-                    Text="点击上方「安装 Mod」导入 .jar 文件" />
+                    Text="点击上方「安装 Mod」导入，或把 .jar 拖进窗口" />
             </StackPanel>
         </Grid>
 
         <!-- 底部：统计 + 状态 -->
         <TextBlock
             x:Name="StatusText"
-            Grid.Row="2"
+            Grid.Row="3"
             Margin="0,8,0,0"
             FontSize="12"
             Foreground="{ThemeResource TextFillColorSecondaryBrush}" />

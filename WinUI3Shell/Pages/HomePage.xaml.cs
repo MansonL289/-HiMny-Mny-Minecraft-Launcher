@@ -1,5 +1,5 @@
 using System;
-using System.Globalization;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Numerics;
@@ -47,6 +47,8 @@ public sealed partial class HomePage : Page
                 .Select(d => (Dir: Path.GetFileName(d)!, Meta: VersionMeta.Load(Path.GetFileName(d)!)))
                 .Where(x => x.Meta != null)
                 .Select(x => (x.Dir, Meta: x.Meta!))
+                // 装了一半的版本（取消/失败/文件缺失）不进启动列表
+                .Where(x => x.Meta.IsComplete(x.Dir))
                 .ToList()
             : new();
         // 置顶优先，其余按名字倒序
@@ -79,9 +81,46 @@ public sealed partial class HomePage : Page
             return item;
         }).ToList();
         VersionComboBox.ItemsSource = comboItems;
+        // 没有保留的上次选择时，按时间挑默认版本：最新下载 > 上次打开 > 不选
+        if (toSelect == null)
+        {
+            string? defaultDir = PickDefaultDir(comboItems);
+            if (defaultDir != null)
+            {
+                toSelect = comboItems.FirstOrDefault(i => (i.Tag as string) == defaultDir);
+            }
+        }
         VersionComboBox.SelectedItem = toSelect;
         LaunchButton.IsEnabled = VersionComboBox.SelectedItem != null;
         VersionSettingsButton.IsEnabled = VersionComboBox.SelectedItem != null;
+    }
+
+    /// <summary>默认版本：比较「最新下载时间」与「上次打开时间」，取较新者；都没有则不选。</summary>
+    private static string? PickDefaultDir(List<ComboBoxItem> items)
+    {
+        var installed = items.Where(i => i.IsEnabled && i.Tag is string).ToList();
+        if (installed.Count == 0) return null;
+
+        string? newestDir = null;
+        DateTime newestTime = DateTime.MinValue;
+        foreach (var item in installed)
+        {
+            string dir = (string)item.Tag!;
+            DateTime created = Directory.GetCreationTime(VersionMeta.DirPath(dir));
+            if (newestDir == null || created > newestTime)
+            {
+                newestDir = dir;
+                newestTime = created;
+            }
+        }
+
+        string lastDir = AppSettings.LastVersion;
+        DateTime lastTime = AppSettings.LastLaunchTicks > 0
+            ? new DateTime(AppSettings.LastLaunchTicks)
+            : DateTime.MinValue;
+        bool lastExists = lastDir.Length > 0 && installed.Any(i => (i.Tag as string) == lastDir);
+
+        return lastExists && lastTime >= newestTime ? lastDir : newestDir;
     }
 
     // 用 Composition DropShadow 给直角头像加阴影（挂在头像后面的承载层上）
@@ -124,6 +163,10 @@ public sealed partial class HomePage : Page
         var meta = VersionMeta.Load(dir);
         if (meta == null) return;
         string versionId = meta.Id;
+
+        // 记录上次打开的版本与时间，供下次首页默认选中
+        AppSettings.LastVersion = dir;
+        AppSettings.LastLaunchTicks = DateTime.Now.Ticks;
 
         LaunchButton.IsEnabled = false;
         VersionComboBox.IsEnabled = false;
@@ -237,16 +280,8 @@ public sealed partial class HomePage : Page
 
     private void SetLaunchStatus(string text) => LaunchStatus.Text = text;
 
-    // 解析游戏语言：设置项为空时跟随系统，"zh-CN" -> "zh_cn"
-    private static string ResolveLocale()
-    {
-        string culture = AppSettings.GameLanguage;
-        if (string.IsNullOrEmpty(culture))
-        {
-            culture = CultureInfo.CurrentUICulture.Name;
-        }
-        return culture.Replace('-', '_').ToLowerInvariant();
-    }
+    // 解析游戏语言：设置项为空时跟随系统；游戏没有的语言依次退回同名语言 / en_us
+    private static string ResolveLocale() => GameLanguages.Resolve(AppSettings.GameLanguage) ?? "en_us";
 
     // 悬浮在名称上时切换为文本指针，移开恢复箭头
     private void NameText_PointerEntered(object sender, PointerRoutedEventArgs e)

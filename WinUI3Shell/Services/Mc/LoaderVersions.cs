@@ -46,7 +46,7 @@ public static class LoaderVersions
     {
         // Fabric meta：该 MC 版本的 loader 列表，本身按新旧排序（最新在前）；BMCLAPI 有 fabric-meta 镜像
         string rel = $"v2/versions/loader/{mcVersion}";
-        var urls = mirror == Mirror.Bmclapi
+        var urls = Mirror.PrefersBmclapi(mirror)
             ? new[] { $"https://bmclapi2.bangbang93.com/fabric-meta/{rel}", $"https://meta.fabricmc.net/{rel}" }
             : new[] { $"https://meta.fabricmc.net/{rel}", $"https://bmclapi2.bangbang93.com/fabric-meta/{rel}" };
         string? json = await TryGetAsync(urls, ct);
@@ -64,7 +64,7 @@ public static class LoaderVersions
         string artifact = legacy ? "forge" : "neoforge";
         string prefix = legacy ? "47.1." : NeoForgePrefix(mcVersion);
         string rel = $"net/neoforged/{artifact}/maven-metadata.xml";
-        var urls = mirror == Mirror.Bmclapi
+        var urls = Mirror.PrefersBmclapi(mirror)
             ? new[] { $"https://bmclapi2.bangbang93.com/maven/{rel}", $"https://maven.neoforged.net/releases/{rel}" }
             : new[] { $"https://maven.neoforged.net/releases/{rel}", $"https://bmclapi2.bangbang93.com/maven/{rel}" };
         string? xml = await TryGetAsync(urls, ct);

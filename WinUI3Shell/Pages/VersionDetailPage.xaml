@@ -52,7 +52,7 @@
 
             <TextBox
                 x:Name="VersionNameBox"
-                Header="版本名（不能重复）"
+                Header="版本名"
                 MaxLength="64" />
         </StackPanel>
 

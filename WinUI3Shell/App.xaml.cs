@@ -74,10 +74,10 @@ public static class AppSettings
         }
     }
 
-    /// <summary>下载镜像：bmclapi / official，启动页补下载文件也用此源。</summary>
+    /// <summary>下载镜像：auto（断点换源）/ bmclapi / official，启动页补下载文件也用此源。</summary>
     public static string DownloadMirror
     {
-        get => GetString("DownloadMirror") ?? "bmclapi";
+        get => GetString("DownloadMirror") ?? "auto";
         set => SetString("DownloadMirror", value);
     }
 
@@ -115,6 +115,27 @@ public static class AppSettings
         set => SetString("GameLanguage", value);
     }
 
+    /// <summary>全局版本隔离策略：off / modded / unofficial / modded_unofficial / all。</summary>
+    public static string VersionIsolation
+    {
+        get => GetString("VersionIsolation") ?? "off";
+        set => SetString("VersionIsolation", value);
+    }
+
+    /// <summary>上次启动的版本名（首页默认选中用）。</summary>
+    public static string LastVersion
+    {
+        get => GetString("LastVersion") ?? "";
+        set => SetString("LastVersion", value);
+    }
+
+    /// <summary>上次启动的时间（Ticks），与最新下载时间比较决定默认选中。</summary>
+    public static long LastLaunchTicks
+    {
+        get => long.TryParse(GetString("LastLaunchTicks"), out long ticks) ? ticks : 0;
+        set => SetString("LastLaunchTicks", value.ToString());
+    }
+
     /// <summary>启动参数 -Xmx 的值：自动=可用内存的 2/3，自定义=设置值（MB）。</summary>
     public static string MaxMemString()
     {
@@ -148,6 +169,22 @@ public static class AppSettings
     {
         using RegistryKey key = Registry.CurrentUser.CreateSubKey(SettingsKey);
         key.SetValue(name, value);
+    }
+
+    /// <summary>重置：删除本用户全部设置，并取消开机自启动。</summary>
+    public static void Reset()
+    {
+        try
+        {
+            Registry.CurrentUser.DeleteSubKeyTree(SettingsKey, false);
+        }
+        catch { /* 删不掉就留着 */ }
+        try
+        {
+            using RegistryKey? key = Registry.CurrentUser.OpenSubKey(RunKey, true);
+            key?.DeleteValue(RunValueName, false);
+        }
+        catch { /* 同上 */ }
     }
 }
 

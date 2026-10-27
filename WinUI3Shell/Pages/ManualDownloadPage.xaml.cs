@@ -67,7 +67,8 @@ public sealed partial class ManualDownloadPage : Page
     // 填充 MC 正式版下拉框（从版本清单里筛 release）
     private async Task LoadMcVersionsAsync()
     {
-        StatusText.Text = "正在获取游戏版本列表...";
+        LoadingRing.Visibility = Visibility.Visible;
+        StatusText.Text = "";
         try
         {
             var manifest = await Manifest.FetchAsync(AppSettings.DownloadMirror);
@@ -79,14 +80,19 @@ public sealed partial class ManualDownloadPage : Page
         {
             StatusText.Text = $"获取失败: {ex.Message}";
         }
+        finally
+        {
+            LoadingRing.Visibility = Visibility.Collapsed;
+        }
     }
 
     private async Task LoadListAsync()
     {
-        StatusText.Text = "正在获取列表...";
+        LoadingRing.Visibility = Visibility.Visible;
         SaveSelectedButton.IsEnabled = false;
         _builds.Clear();
         BuildList.ItemsSource = null;
+        StatusText.Text = "";
         try
         {
             switch (_loader)
@@ -148,6 +154,10 @@ public sealed partial class ManualDownloadPage : Page
         catch (Exception ex)
         {
             StatusText.Text = $"获取失败: {ex.Message}";
+        }
+        finally
+        {
+            LoadingRing.Visibility = Visibility.Collapsed;
         }
     }
 

@@ -1,8 +1,7 @@
 using System;
-using System.Globalization;
-using System.Linq;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using WinUI3Shell.Services.Mc;
 
 namespace WinUI3Shell.Pages;
 
@@ -34,30 +33,46 @@ public sealed partial class GameSettingsPage : Page
             WindowSizeBox.SelectedIndex = 0; // 默认 854×480
         }
 
-        // 游戏语言：跟随系统 + 所有系统区域设置
+        // 游戏语言：跟随系统 + 已安装版本里真实存在的语言
+        GameLanguages.Invalidate();
         LanguageBox.Items.Add(new ComboBoxItem { Content = "跟随系统", Tag = "" });
-        foreach (var culture in CultureInfo.GetCultures(CultureTypes.SpecificCultures).OrderBy(c => c.NativeName))
+        foreach (var lang in GameLanguages.Available())
         {
-            LanguageBox.Items.Add(new ComboBoxItem
-            {
-                Content = $"{culture.NativeName} ({culture.Name})",
-                Tag = culture.Name,
-            });
+            LanguageBox.Items.Add(new ComboBoxItem { Content = lang.Display, Tag = lang.Code });
         }
         string savedLang = AppSettings.GameLanguage;
         LanguageBox.SelectedIndex = 0;
-        for (int i = 0; i < LanguageBox.Items.Count; i++)
+        bool found = string.IsNullOrEmpty(savedLang);
+        for (int i = 1; i < LanguageBox.Items.Count; i++)
         {
             if (((ComboBoxItem)LanguageBox.Items[i]).Tag?.ToString() == savedLang)
             {
                 LanguageBox.SelectedIndex = i;
+                found = true;
                 break;
             }
+        }
+        if (!found)
+        {
+            // 游戏里没有这个语言：不显示该选项，设置也一并回到跟随系统
+            AppSettings.GameLanguage = "";
         }
 
         MemoryModeRadio.SelectedIndex = AppSettings.MemoryMode == "custom" ? 1 : 0;
         MemoryBox.Value = AppSettings.MemoryMb;
         MemoryBox.IsEnabled = AppSettings.MemoryMode == "custom";
+
+        // 全局版本隔离策略
+        string savedIsolation = AppSettings.VersionIsolation;
+        IsolationBox.SelectedIndex = 0;
+        for (int i = 0; i < IsolationBox.Items.Count; i++)
+        {
+            if (((ComboBoxItem)IsolationBox.Items[i]).Tag?.ToString() == savedIsolation)
+            {
+                IsolationBox.SelectedIndex = i;
+                break;
+            }
+        }
 
         _initializing = false;
 
@@ -91,6 +106,16 @@ public sealed partial class GameSettingsPage : Page
         }
 
         AppSettings.GameLanguage = item.Tag?.ToString() ?? "";
+    }
+
+    private void IsolationBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_initializing || IsolationBox.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+
+        AppSettings.VersionIsolation = item.Tag?.ToString() ?? "off";
     }
 
     private void MemoryModeRadio_SelectionChanged(object sender, SelectionChangedEventArgs e)

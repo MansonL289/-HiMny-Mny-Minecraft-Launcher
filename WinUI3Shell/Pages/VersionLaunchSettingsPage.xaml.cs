@@ -23,7 +23,14 @@ public sealed partial class VersionLaunchSettingsPage : Page
         _shell = (VersionSettingsPage)e.Parameter;
         var meta = _shell.Meta;
 
-        IsolationToggle.IsOn = meta.Isolation;
+        // 旧配置只有 Isolation 布尔值：曾经打开过的按「隔离」显示
+        string isolation = meta.IsolationMode == "global" && meta.Isolation ? "on" : meta.IsolationMode;
+        IsolationCombo.SelectedIndex = isolation switch
+        {
+            "on" => 1,
+            "off" => 2,
+            _ => 0,
+        };
 
         JavaCombo.SelectedIndex = string.IsNullOrEmpty(meta.JavaPath) ? 0 : 1;
         JavaPathBox.Text = meta.JavaPath;
@@ -49,7 +56,10 @@ public sealed partial class VersionLaunchSettingsPage : Page
         if (_loading) return;
         var meta = Shell.Meta;
 
-        meta.Isolation = IsolationToggle.IsOn;
+        string isolation = (IsolationCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "global";
+        meta.IsolationMode = isolation;
+        // 同步旧字段：旧版启动器只认 Isolation，尽量保持行为一致
+        meta.Isolation = isolation == "on";
 
         bool customJava = (JavaCombo.SelectedItem as ComboBoxItem)?.Tag as string == "custom";
         JavaCustomPanel.Visibility = customJava ? Visibility.Visible : Visibility.Collapsed;

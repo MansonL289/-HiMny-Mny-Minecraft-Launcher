@@ -29,12 +29,19 @@
             </Button>
         </StackPanel>
 
-        <ListView
-            x:Name="VersionList"
-            Grid.Row="1"
-            Margin="0,10,0,10"
-            IsItemClickEnabled="True"
-            ItemClick="VersionList_ItemClick" />
+        <Grid Grid.Row="1" Margin="0,10,0,10">
+            <ListView
+                x:Name="VersionList"
+                IsItemClickEnabled="True"
+                ItemClick="VersionList_ItemClick" />
+            <ProgressRing
+                x:Name="LoadingRing"
+                Width="36"
+                Height="36"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Visibility="Collapsed" />
+        </Grid>
 
         <TextBlock
             x:Name="DlStatus"
