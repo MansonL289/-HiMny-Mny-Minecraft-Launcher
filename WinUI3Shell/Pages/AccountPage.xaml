@@ -30,12 +30,10 @@
         <Grid Grid.Row="1" Margin="0,16,0,0">
             <ListView
                 x:Name="AccountList"
-                IsItemClickEnabled="True"
-                ItemClick="AccountList_ItemClick"
                 SelectionMode="None">
                 <ListView.ItemTemplate>
                     <DataTemplate>
-                        <Grid Padding="0,8" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                        <Grid Padding="0,8" ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="12">
                             <!-- 皮肤头像 -->
                             <Grid Width="40" Height="40" VerticalAlignment="Center">
                                 <Border Background="{ThemeResource ControlFillColorSecondaryBrush}" CornerRadius="4" />
@@ -67,6 +65,13 @@
                                 Visibility="{Binding ActiveVisibility}" />
                             <Button
                                 Grid.Column="3"
+                                VerticalAlignment="Center"
+                                Click="Select_Click"
+                                Content="选择"
+                                Tag="{Binding}"
+                                Visibility="{Binding SelectVisibility}" />
+                            <Button
+                                Grid.Column="4"
                                 VerticalAlignment="Center"
                                 Click="Delete_Click"
                                 Content="删除"

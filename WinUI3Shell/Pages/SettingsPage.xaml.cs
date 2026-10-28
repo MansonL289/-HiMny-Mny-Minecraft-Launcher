@@ -30,6 +30,7 @@ public sealed partial class SettingsPage : Page
             nameof(DownloadSettingsPage) => "下载",
             nameof(LauncherSettingsPage) => "启动器",
             nameof(RepairPage) => "修复与导入",
+            nameof(LogsPage) => "日志",
             nameof(StoragePage) => "储存",
             nameof(StorageSavesPage) => "储存",
             nameof(AboutPage) => "关于",

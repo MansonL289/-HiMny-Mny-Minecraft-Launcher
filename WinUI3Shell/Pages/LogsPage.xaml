@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinUI3Shell.Pages.LogsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Loaded="LogsPage_Loaded">
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <!-- 工具栏 -->
+        <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button
+                x:Name="RefreshButton"
+                Click="Refresh_Click"
+                ToolTipService.ToolTip="刷新">
+                <SymbolIcon Symbol="Refresh" />
+            </Button>
+            <Button Click="OpenLogDir_Click" Content="打开日志文件夹" />
+        </StackPanel>
+
+        <Grid Grid.Row="1" Margin="0,12,0,0">
+            <StackPanel Spacing="8">
+                <TextBlock
+                    x:Name="HeadlineText"
+                    FontWeight="SemiBold"
+                    TextWrapping="Wrap" />
+                <ItemsControl x:Name="FindingsList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock
+                                FontSize="12"
+                                Opacity="0.75"
+                                Text="{Binding}"
+                                TextWrapping="Wrap" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBox
+                    x:Name="LogBox"
+                    MinHeight="320"
+                    MaxHeight="440"
+                    Margin="0,4,0,0"
+                    AcceptsReturn="True"
+                    FontFamily="Consolas"
+                    FontSize="12"
+                    IsReadOnly="True"
+                    ScrollViewer.VerticalScrollBarVisibility="Auto"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- 加载动画：容器正中 -->
+            <ProgressRing
+                x:Name="LoadingRing"
+                Width="36"
+                Height="36"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Visibility="Collapsed" />
+        </Grid>
+
+        <TextBlock
+            x:Name="StatusText"
+            Grid.Row="2"
+            Margin="0,8,0,0"
+            FontSize="12"
+            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+            TextWrapping="Wrap" />
+    </Grid>
+</Page>

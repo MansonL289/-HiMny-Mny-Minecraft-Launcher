@@ -21,7 +21,6 @@ namespace WinUI3Shell.Pages;
 
 public sealed partial class HomePage : Page
 {
-    private bool _filtering;
     private CancellationTokenSource? _launchCts;
 
     public HomePage()
@@ -53,7 +52,7 @@ public sealed partial class HomePage : Page
         };
     }
 
-    /// <summary>按当前账号刷新名称与皮肤头；没有账号时显示 Steve。</summary>
+    /// <summary>按当前账号刷新名称与皮肤头；离线账号/没有账号时显示默认头像。</summary>
     private void RefreshAccount()
     {
         var account = AccountStore.Active;
@@ -66,6 +65,13 @@ public sealed partial class HomePage : Page
         }
 
         NameText.Text = account.Name;
+        // 离线账号没有皮肤，按名字去 mc-heads 会拉到别人的重名皮肤，始终用本地默认头像
+        if (account.Type == "offline")
+        {
+            AvatarImage.Source = null;
+            AvatarImage.Visibility = Visibility.Collapsed;
+            return;
+        }
         AvatarImage.Source = new BitmapImage(
             new Uri($"https://mc-heads.net/avatar/{Uri.EscapeDataString(account.Name)}/56"));
         AvatarImage.Visibility = Visibility.Visible;
@@ -409,14 +415,6 @@ public sealed partial class HomePage : Page
         }
     }
 
-    private async void LogButton_Click(object sender, RoutedEventArgs e)
-    {
-        string gameDir = (VersionComboBox.SelectedItem as ComboBoxItem)?.Tag is string dir
-            ? (VersionMeta.Load(dir)?.GameDir(dir) ?? McPaths.GameDir)
-            : McPaths.GameDir;
-        await ShowLogDialogAsync(gameDir);
-    }
-
     /// <summary>日志窗口：先给中文结论，下面是最新日志 / 崩溃报告原文。</summary>
     private async Task ShowLogDialogAsync(string gameDir)
     {
@@ -509,74 +507,30 @@ public sealed partial class HomePage : Page
 
     private void NameText_Tapped(object sender, TappedRoutedEventArgs e)
     {
-        // 在线账号的名称由验证服务器决定，不能改；点名称直接去账号页
-        var account = AccountStore.Active;
-        if (account != null && account.Type != "offline")
+        // 点名字弹出账号下拉框：切换账号 / 去账号页添加
+        var flyout = new MenuFlyout();
+        string activeKey = AccountStore.ActiveKey;
+        foreach (var account in AccountStore.Accounts)
         {
-            App.MainWindow?.ShowAccount();
-            return;
+            var item = new MenuFlyoutItem
+            {
+                Text = account.Name + (AccountStore.KeyOf(account) == activeKey ? "（使用中）" : ""),
+                Tag = account,
+            };
+            item.Click += AccountFlyoutItem_Click;
+            flyout.Items.Add(item);
         }
-        NameBox.Text = NameText.Text;
-        NameText.Visibility = Visibility.Collapsed;
-        NameBox.Visibility = Visibility.Visible;
-        NameBox.Focus(FocusState.Programmatic);
-        NameBox.SelectAll();
+        flyout.Items.Add(new MenuFlyoutSeparator());
+        var addItem = new MenuFlyoutItem { Text = "添加账号" };
+        addItem.Click += (_, _) => App.MainWindow?.ShowAccount(openAdd: true);
+        flyout.Items.Add(addItem);
+        flyout.ShowAt(NameText);
     }
 
-    private void NameBox_TextChanged(object sender, TextChangedEventArgs e)
+    private void AccountFlyoutItem_Click(object sender, RoutedEventArgs e)
     {
-        // 只允许英文字母、数字和下划线
-        if (_filtering)
-        {
-            return;
-        }
-
-        string filtered = new(NameBox.Text.Where(c => char.IsAsciiLetterOrDigit(c) || c == '_').ToArray());
-        if (filtered != NameBox.Text)
-        {
-            _filtering = true;
-            int caret = NameBox.SelectionStart;
-            NameBox.Text = filtered;
-            NameBox.SelectionStart = Math.Min(caret, filtered.Length);
-            _filtering = false;
-        }
-    }
-
-    private void NameBox_KeyDown(object sender, KeyRoutedEventArgs e)
-    {
-        if (e.Key == VirtualKey.Enter)
-        {
-            e.Handled = true;
-            CommitName();
-        }
-    }
-
-    private void NameBox_LostFocus(object sender, RoutedEventArgs e)
-    {
-        CommitName();
-    }
-
-    private void CommitName()
-    {
-        if (NameBox.Visibility == Visibility.Collapsed)
-        {
-            return;
-        }
-
-        string name = string.IsNullOrWhiteSpace(NameBox.Text) ? "Steve" : NameBox.Text;
-        NameText.Text = name;
-        NameBox.Visibility = Visibility.Collapsed;
-        NameText.Visibility = Visibility.Visible;
-
-        // 离线账号改名：UUID 随名字重新计算，账号记录同步保存
-        var account = AccountStore.Active;
-        if (account != null && account.Type == "offline")
-        {
-            AccountStore.Remove(account);
-            account.Name = name;
-            account.Uuid = LaunchService.OfflineUuid(name);
-            AccountStore.Add(account);
-        }
+        if (sender is not MenuFlyoutItem { Tag: McAccount account }) return;
+        AccountStore.SetActive(account);
         RefreshAccount();
     }
 }

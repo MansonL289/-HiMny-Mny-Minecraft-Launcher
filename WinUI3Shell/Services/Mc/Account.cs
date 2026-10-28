@@ -194,17 +194,35 @@ public static class AccountStore
         _activeKey = "";
         try
         {
-            if (!File.Exists(FilePath)) return;
-            var file = JsonSerializer.Deserialize<AccountsFile>(File.ReadAllText(FilePath), JsonOptions);
-            if (file?.Accounts == null) return;
-            Items.AddRange(file.Accounts.Where(a => a != null));
-            _activeKey = file.Active ?? "";
+            if (File.Exists(FilePath))
+            {
+                var file = JsonSerializer.Deserialize<AccountsFile>(File.ReadAllText(FilePath), JsonOptions);
+                if (file?.Accounts != null)
+                {
+                    Items.AddRange(file.Accounts.Where(a => a != null));
+                    _activeKey = file.Active ?? "";
+                }
+            }
         }
         catch
         {
             // 文件损坏：当作空列表，不打断启动
             Items.Clear();
             _activeKey = "";
+        }
+
+        // 默认自带一个 Steve 离线账号，保证始终有可用账号
+        if (Items.Count == 0)
+        {
+            var steve = new McAccount
+            {
+                Type = "offline",
+                Name = "Steve",
+                Uuid = LaunchService.OfflineUuid("Steve"),
+            };
+            Items.Add(steve);
+            _activeKey = KeyOf(steve);
+            SaveCore();
         }
     }
 

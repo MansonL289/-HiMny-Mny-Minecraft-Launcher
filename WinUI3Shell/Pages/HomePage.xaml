@@ -42,29 +42,8 @@
                     Tapped="NameText_Tapped"
                     PointerEntered="NameText_PointerEntered"
                     PointerExited="NameText_PointerExited" />
-
-                <TextBox
-                    x:Name="NameBox"
-                    Width="140"
-                    FontSize="16"
-                    MaxLength="16"
-                    TextAlignment="Center"
-                    Visibility="Collapsed"
-                    TextChanged="NameBox_TextChanged"
-                    LostFocus="NameBox_LostFocus"
-                    KeyDown="NameBox_KeyDown" />
             </Grid>
         </StackPanel>
-
-        <!-- 右上角：查看日志（读 latest.log / 崩溃报告并给出结论） -->
-        <Button
-            Grid.Row="0"
-            HorizontalAlignment="Right"
-            VerticalAlignment="Top"
-            Padding="12,4"
-            FontSize="12"
-            Content="日志"
-            Click="LogButton_Click" />
 
         <!-- 游玩统计 + 启动状态：进度条仅在启动流程中显示 -->
         <StackPanel Grid.Row="1" Spacing="4">

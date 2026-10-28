@@ -12,12 +12,16 @@ public sealed class AccountItem
     public McAccount Account { get; init; } = new();
     public string Name => Account.Name;
     public string DetailText { get; init; } = "";
-    public string AvatarUrl => $"https://mc-heads.net/avatar/{Uri.EscapeDataString(Account.Name)}/40";
+    /// <summary>头像：离线账号用本地默认头像（按名字拉 mc-heads 会拉到别人的重名皮肤），在线账号拉皮肤头。</summary>
+    public string AvatarUrl => Account.Type == "offline"
+        ? "ms-appx:///Assets/Head.png"
+        : $"https://mc-heads.net/avatar/{Uri.EscapeDataString(Account.Name)}/40";
     public bool Active { get; init; }
     public Visibility ActiveVisibility => Active ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility SelectVisibility => Active ? Visibility.Collapsed : Visibility.Visible;
 }
 
-/// <summary>账号页：管理离线 / 微软 / 第三方账号，点击行切换当前账号。</summary>
+/// <summary>账号页：管理离线 / 微软 / 第三方账号，点「选择」按钮切换当前账号。</summary>
 public sealed partial class AccountPage : Page
 {
     private readonly ObservableCollection<AccountItem> _items = new();
@@ -52,12 +56,17 @@ public sealed partial class AccountPage : Page
         AccountList.Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
     }
 
-    // 点击账号行：设为当前账号
-    private void AccountList_ItemClick(object sender, ItemClickEventArgs e)
+    /// <summary>打开「添加账号」下拉（首页下拉框选「添加账号」时跳转过来直接弹出）。</summary>
+    public void OpenAdd()
     {
-        if (e.ClickedItem is not AccountItem item) return;
-        // 行内「删除」可能先触发，已被移出列表的项不再设为当前账号
-        if (!_items.Contains(item)) return;
+        if (_busy) return;
+        AddButton.Flyout?.ShowAt(AddButton);
+    }
+
+    // 「选择」按钮：设为当前账号
+    private void Select_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: AccountItem item }) return;
         AccountStore.SetActive(item.Account);
         RefreshList();
         StatusText.Text = $"当前账号：{item.Name}";

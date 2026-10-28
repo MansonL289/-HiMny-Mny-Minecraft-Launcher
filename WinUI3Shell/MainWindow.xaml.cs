@@ -109,8 +109,8 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    /// <summary>跳到账号页（首页点击在线账号名时调用）。</summary>
-    public void ShowAccount()
+    /// <summary>跳到账号页；openAdd 为 true 时顺带弹出「添加账号」下拉（首页点「添加账号」）。</summary>
+    public void ShowAccount(bool openAdd = false)
     {
         foreach (var obj in NavView.FooterMenuItems)
         {
@@ -119,6 +119,10 @@ public sealed partial class MainWindow : Window
                 NavView.SelectedItem = navItem;
                 break;
             }
+        }
+        if (openAdd && ContentFrame.Content is AccountPage accountPage)
+        {
+            accountPage.OpenAdd();
         }
     }
 
