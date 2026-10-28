@@ -30,8 +30,11 @@ public sealed class DownloadJob
     public bool IsMod { get; init; }
     /// <summary>进度 0~1（MOD 任务用，版本任务看 StatusText 里的文件计数）。</summary>
     public double Fraction { get; set; }
+    /// <summary>非空 = 整合包安装任务（走 ModpackInstaller）。</summary>
+    public ModpackInfo? Pack { get; init; }
+    public bool IsModpack => Pack != null;
     /// <summary>加载器后缀显示文本（如 " + Forge"）。</summary>
-    public string AddonText => Addon switch
+    public string AddonText => Pack != null ? " · 整合包" : Addon switch
     {
         McAddon.Fabric => " + Fabric",
         McAddon.Forge => " + Forge",
@@ -99,6 +102,25 @@ public static class DownloadManager
         return job;
     }
 
+    /// <summary>启动一个整合包安装任务（游戏本体 + 加载器 + 整合包文件）。</summary>
+    public static DownloadJob StartModpack(ModpackInfo pack, string installName, string mirror)
+    {
+        var job = new DownloadJob
+        {
+            VersionId = pack.McVersion,
+            InstallName = installName,
+            Addon = McAddon.None,
+            Pack = pack,
+            Cts = new CancellationTokenSource(),
+            CreatedDir = !Directory.Exists(VersionMeta.DirPath(installName)),
+        };
+        new VersionMeta { Id = pack.McVersion, IsolationMode = "on" }.Save(installName);
+        lock (Gate) JobsList.Add(job);
+        JobsChanged?.Invoke(null, EventArgs.Empty);
+        _ = Task.Run(() => RunJobAsync(job, mirror));
+        return job;
+    }
+
     /// <summary>启动一个 MOD 入库下载任务：与版本任务一样出现在下载任务页和标题栏指示器。</summary>
     /// <param name="title">Mod 名（显示用）。</param>
     /// <param name="body">任务体；内部用 <see cref="Report"/> 更新进度。</param>
@@ -156,6 +178,17 @@ public static class DownloadManager
         });
         try
         {
+            // 整合包：游戏本体 + 加载器 + 整合包文件全部由 ModpackInstaller 完成
+            if (job.Pack != null)
+            {
+                await ModpackInstaller.InstallAsync(job.Pack, job.InstallName, mirror, progress, job.Cts.Token);
+                job.Done = true;
+                job.StatusText = "整合包安装完成";
+                GameLanguages.Invalidate();
+                JobsChanged?.Invoke(null, EventArgs.Empty);
+                return;
+            }
+
             var versionJson = await Installer.PrepareAsync(job.VersionId, mirror, 16, progress, job.Cts.Token, job.InstallName);
 
             if (job.Addon == McAddon.Fabric)

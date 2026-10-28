@@ -22,6 +22,14 @@
                 </StackPanel>
             </Button>
             <Button Click="OpenModsDir_Click" Content="打开 Mod 文件夹" />
+            <Button x:Name="CheckUpdateButton" Click="CheckUpdate_Click" Content="检查更新" />
+            <ProgressRing
+                x:Name="UpdateRing"
+                Width="20"
+                Height="20"
+                IsActive="False"
+                VerticalAlignment="Center"
+                Visibility="Collapsed" />
             <Button
                 AutomationProperties.Name="刷新列表"
                 ToolTipService.ToolTip="刷新列表"

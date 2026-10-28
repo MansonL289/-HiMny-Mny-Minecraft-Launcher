@@ -63,8 +63,13 @@
                 </NavigationViewItem>
             </NavigationView.MenuItems>
 
-            <!-- 底部固定区：MOD 库、设置 -->
+            <!-- 底部固定区：账号、MOD 库、设置 -->
             <NavigationView.FooterMenuItems>
+                <NavigationViewItem Content="账号" Tag="Account">
+                    <NavigationViewItem.Icon>
+                        <SymbolIcon Symbol="Contact" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem Content="MOD库" Tag="Mod.Library">
                     <NavigationViewItem.Icon>
                         <SymbolIcon Symbol="Library" />

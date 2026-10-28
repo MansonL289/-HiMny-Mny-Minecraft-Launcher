@@ -2,7 +2,7 @@ using Microsoft.UI.Xaml.Controls;
 
 namespace WinUI3Shell.Pages;
 
-/// <summary>下载设置：下载源（镜像）。</summary>
+/// <summary>下载设置：下载源（镜像）与下载限速。</summary>
 public sealed partial class DownloadSettingsPage : Page
 {
     private bool _initializing;
@@ -21,6 +21,17 @@ public sealed partial class DownloadSettingsPage : Page
                 break;
             }
         }
+
+        string limit = AppSettings.DownloadLimitKb.ToString();
+        LimitBox.SelectedIndex = 0; // 兜底「不限速」
+        for (int i = 0; i < LimitBox.Items.Count; i++)
+        {
+            if (LimitBox.Items[i] is ComboBoxItem item && item.Tag as string == limit)
+            {
+                LimitBox.SelectedIndex = i;
+                break;
+            }
+        }
         _initializing = false;
     }
 
@@ -32,5 +43,15 @@ public sealed partial class DownloadSettingsPage : Page
         }
 
         AppSettings.DownloadMirror = item.Tag?.ToString() ?? Services.Mc.Mirror.Auto;
+    }
+
+    private void LimitBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_initializing || LimitBox.SelectedItem is not ComboBoxItem item)
+        {
+            return;
+        }
+
+        AppSettings.DownloadLimitKb = int.TryParse(item.Tag?.ToString(), out int kb) ? kb : 0;
     }
 }

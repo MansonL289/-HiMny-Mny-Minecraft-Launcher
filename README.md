@@ -1,6 +1,6 @@
 # MnyMinecraftLauncher
 
-新版本安装时需要卸载旧版本
+~~新版本安装时需要卸载旧版本~~(Beta 1.2+自动删除替换)
 
 ###### *AI写的README凑合看吧*
 
@@ -67,28 +67,8 @@ dotnet publish WinUI3Shell/WinUI3Shell.csproj -c Release -p:Platform=x64 -p:Self
 
 > 说明：csproj 里已内置 CopyXamlArtifactsToPublish 目标，发布时自动补齐 XAML 编译产物，所以上面的命令不需要任何额外步骤，也不会出现发布版闪退的问题。
 
-## 目录结构
-
-```
-WinUI3Shell/
-├── Pages/                  # 页面：启动、下载、任务、版本详情、版本设置（常规/设置/Mod）
-│   ├── HomePage            # 启动页：版本选择、玩家名、进度、取消
-│   ├── DownloadsPage       # 下载外壳：游戏版本 / 手动下载 / 下载任务
-│   ├── VersionDetailPage   # 安装页：加载器选择 + 构建版本下拉
-│   └── VersionSettingsPage # 版本设置外壳
-├── Services/Mc/            # 核心逻辑
-│   ├── Manifest.cs         # 版本清单
-│   ├── Installer.cs        # 原版安装管线（库/natives/资源/log4j）
-│   ├── ForgeInstaller.cs   # Forge/NeoForge 安装（新旧两种安装器格式）
-│   ├── LoaderInstaller.cs  # Fabric 合并安装
-│   ├── DownloadManager.cs  # 后台任务队列
-│   ├── Launch.cs           # 启动命令拼接、进程与日志
-│   └── Java.cs             # Java 查找/下载、版本范围匹配
-└── MainWindow              # 导航外壳、标题栏、主题
-```
-
-游戏数据默认存放于 `%USERPROFILE%\.mnymc`（versions / libraries / assets / runtimes / logs）。
 
 ## 说明
 
+- 游戏数据默认存放于 `%USERPROFILE%\.mnymc`（versions / libraries / assets / runtimes / logs）。
 - 设置保存在注册表 `HKCU\Software\MnyMC`。

@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
@@ -128,6 +129,109 @@ public sealed partial class VersionModsPage : Page
     }
 
     private void Refresh_Click(object sender, RoutedEventArgs e) => RefreshList();
+
+    // ========== 更新检查 ==========
+
+    private void SetUpdating(bool updating)
+    {
+        CheckUpdateButton.IsEnabled = !updating;
+        UpdateRing.IsActive = updating;
+        UpdateRing.Visibility = updating ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async void CheckUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        if (_loader.Length == 0)
+        {
+            UpdateStatus("当前版本未安装加载器，无需检查更新");
+            return;
+        }
+        SetUpdating(true);
+        UpdateStatus("正在检查 Mod 更新…");
+        List<ModUpdateInfo> updates;
+        try
+        {
+            updates = await ModUpdate.CheckAsync(ModsDir, Shell.Meta.McVersion(Shell.Dir), LoaderKind);
+        }
+        catch (Exception ex)
+        {
+            UpdateStatus($"检查更新失败: {ex.Message}");
+            return;
+        }
+        finally
+        {
+            SetUpdating(false);
+        }
+
+        if (updates.Count == 0)
+        {
+            StatusText.Text = "所有 Mod 都是最新版";
+            return;
+        }
+
+        var list = new ListView { SelectionMode = ListViewSelectionMode.None, MaxHeight = 320 };
+        foreach (var update in updates)
+        {
+            var row = new StackPanel { Spacing = 2, Padding = new Thickness(0, 4, 0, 4) };
+            row.Children.Add(new TextBlock
+            {
+                Text = update.ModName,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+            });
+            row.Children.Add(new TextBlock
+            {
+                Text = update.SummaryText,
+                FontSize = 12,
+                Opacity = 0.7,
+            });
+            list.Items.Add(row);
+        }
+        var dialog = new ContentDialog
+        {
+            Title = $"发现 {updates.Count} 个可更新的 Mod",
+            Content = list,
+            PrimaryButtonText = "全部更新",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot,
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        await UpdateAllAsync(updates);
+    }
+
+    /// <summary>逐个更新；单个失败不中断，最后汇总失败数量。</summary>
+    private async Task UpdateAllAsync(List<ModUpdateInfo> updates)
+    {
+        SetUpdating(true);
+        int ok = 0;
+        var failed = new List<string>();
+        try
+        {
+            for (int i = 0; i < updates.Count; i++)
+            {
+                var update = updates[i];
+                UpdateStatus($"正在更新 {i + 1}/{updates.Count}：{update.ModName}");
+                try
+                {
+                    await ModUpdate.UpdateAsync(ModsDir, update, null);
+                    ok++;
+                }
+                catch (Exception ex)
+                {
+                    failed.Add($"{update.ModName}（{ex.Message}）");
+                }
+            }
+        }
+        finally
+        {
+            SetUpdating(false);
+        }
+        RefreshList();
+        StatusText.Text = failed.Count == 0
+            ? $"已更新 {ok} 个 Mod"
+            : $"已更新 {ok} 个 Mod，{failed.Count} 个失败：{string.Join("；", failed)}";
+    }
 
     private async void InstallMods_Click(object sender, RoutedEventArgs e)
     {

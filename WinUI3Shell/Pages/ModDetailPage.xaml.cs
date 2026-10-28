@@ -273,9 +273,9 @@ public sealed partial class ModDetailPage : Page
         {
             var progress = new Progress<ModInstallProgress>(p =>
                 DownloadManager.Report(job, p.Status, p.Fraction));
-            DownloadManager.Report(job, "下载到库...", 0);
+            DownloadManager.Report(job, "下载到库…", 0);
             await ModInstaller.DownloadJarToAsync(jar, ModLibrary.DirFor(_project.ProjectId),
-                progress, "下载到库...", ct);
+                progress, "下载到库…", ct);
             _pendingEntry = ModLibrary.UpsertFile(_project.ProjectId, _project.Title, _project.Author,
                 _project.IconUrl, new ModLibraryFile
                 {
@@ -365,7 +365,7 @@ public sealed partial class ModDetailPage : Page
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
         _pendingJob?.Cts.Cancel();
-        StatusText.Text = "正在取消...";
+        StatusText.Text = "正在取消…";
     }
 
     private void Back_Click(object sender, RoutedEventArgs e)

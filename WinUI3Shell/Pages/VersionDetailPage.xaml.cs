@@ -128,7 +128,7 @@ public sealed partial class VersionDetailPage : Page
         var items = new List<LoaderVersionOption> { new("自动选择最新版（推荐）", null) };
         LoaderVersionCombo.ItemsSource = items;
         LoaderVersionCombo.SelectedIndex = 0;
-        LoaderVersionStatus.Text = "正在获取可用版本...";
+        LoaderVersionStatus.Text = "正在获取可用版本…";
         try
         {
             // 支持性检测已缓存则直接用，否则现场拉取

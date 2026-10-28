@@ -22,6 +22,10 @@
                 x:Name="PinToggle"
                 Header="置顶（版本选择时排在最前）"
                 Toggled="PinToggle_Toggled" />
+            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
+                <Button Click="ChangeIcon_Click" Content="更改图标" />
+                <Button Click="ClearIcon_Click" Content="清除图标" />
+            </StackPanel>
             <TextBlock
                 x:Name="StatusText"
                 FontSize="12"

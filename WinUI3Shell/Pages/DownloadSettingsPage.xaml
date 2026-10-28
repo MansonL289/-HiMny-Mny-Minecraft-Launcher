@@ -17,5 +17,20 @@
                 <ComboBoxItem Content="官方源" Tag="official" />
             </ComboBox>
         </StackPanel>
+
+        <StackPanel Spacing="8">
+            <TextBlock Text="下载限速" Style="{StaticResource BodyStrongTextBlockStyle}" />
+            <ComboBox
+                x:Name="LimitBox"
+                Width="240"
+                HorizontalAlignment="Left"
+                SelectionChanged="LimitBox_SelectionChanged">
+                <ComboBoxItem Content="不限速" Tag="0" />
+                <ComboBoxItem Content="1 MB/s" Tag="1024" />
+                <ComboBoxItem Content="2 MB/s" Tag="2048" />
+                <ComboBoxItem Content="5 MB/s" Tag="5120" />
+                <ComboBoxItem Content="10 MB/s" Tag="10240" />
+            </ComboBox>
+        </StackPanel>
     </StackPanel>
 </Page>

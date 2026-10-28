@@ -33,6 +33,8 @@
                 <NavigationViewItem Content="常规" Tag="general" Margin="0,8,0,0" IsSelected="True" />
                 <NavigationViewItem Content="设置" Tag="launch" />
                 <NavigationViewItem Content="存档" Tag="saves" />
+                <NavigationViewItem Content="截图" Tag="screenshots" />
+                <NavigationViewItem Content="资源包" Tag="packs" />
                 <NavigationViewItem Content="Mod 管理" Tag="mods" />
             </NavigationView.MenuItems>
             <Frame x:Name="SubFrame">

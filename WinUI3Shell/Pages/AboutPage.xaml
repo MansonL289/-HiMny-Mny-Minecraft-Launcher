@@ -27,6 +27,20 @@
                     Padding="0"
                     Content="https://github.com/MansonL289/HiMny-MnyMinecraftLauncher/tags"
                     NavigateUri="https://github.com/MansonL289/HiMny-MnyMinecraftLauncher/tags" />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button x:Name="CheckUpdateButton" Click="CheckUpdate_Click" Content="检查更新" />
+                    <ProgressRing
+                        x:Name="CheckRing"
+                        Width="20"
+                        Height="20"
+                        VerticalAlignment="Center"
+                        Visibility="Collapsed" />
+                </StackPanel>
+                <TextBlock
+                    x:Name="UpdateText"
+                    FontSize="12"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    TextWrapping="Wrap" />
             </StackPanel>
         </StackPanel>
     </ScrollViewer>

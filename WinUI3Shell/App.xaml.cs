@@ -81,6 +81,13 @@ public static class AppSettings
         set => SetString("DownloadMirror", value);
     }
 
+    /// <summary>下载限速（KB/s），0 = 不限速。</summary>
+    public static int DownloadLimitKb
+    {
+        get => GetInt("DownloadLimitKb", 0);
+        set => SetInt("DownloadLimitKb", Math.Max(value, 0));
+    }
+
     /// <summary>游戏窗口宽（启动时通过 --width 传给游戏）。</summary>
     public static int WindowWidth
     {

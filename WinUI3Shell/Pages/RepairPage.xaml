@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinUI3Shell.Pages.RepairPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="24">
+                <!-- 版本修复 -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="版本修复" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <ComboBox
+                            x:Name="VersionBox"
+                            MinWidth="220"
+                            PlaceholderText="选择版本"
+                            SelectionChanged="VersionBox_SelectionChanged" />
+                        <Button x:Name="CheckButton" Click="Check_Click" Content="检查" />
+                    </StackPanel>
+                    <TextBlock
+                        x:Name="CheckText"
+                        TextWrapping="Wrap"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button
+                            x:Name="FixButton"
+                            Click="Fix_Click"
+                            Content="一键修复"
+                            IsEnabled="False" />
+                        <TextBlock
+                            x:Name="FixStatus"
+                            VerticalAlignment="Center"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- 从其他启动器导入 -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="从其他启动器导入" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button
+                            x:Name="PickButton"
+                            Click="PickRoot_Click"
+                            Content="选择 .minecraft 目录" />
+                        <TextBlock
+                            x:Name="RootText"
+                            VerticalAlignment="Center"
+                            FontSize="12"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            MaxWidth="520"
+                            TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                    <ListView
+                        x:Name="ImportList"
+                        MaxHeight="240"
+                        MinHeight="120"
+                        SelectionMode="Multiple">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Padding="0,4" Spacing="2">
+                                    <TextBlock
+                                        Text="{Binding Name}"
+                                        FontWeight="SemiBold"
+                                        TextTrimming="CharacterEllipsis" />
+                                    <TextBlock
+                                        FontSize="12"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="{Binding DetailText}"
+                                        TextTrimming="CharacterEllipsis" />
+                                    <TextBlock
+                                        FontSize="11"
+                                        Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                        Text="缺少文件"
+                                        Visibility="{Binding MissingVisibility}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <CheckBox x:Name="ImportSavesBox" Content="同时导入存档" />
+                        <Button
+                            x:Name="ImportButton"
+                            Click="Import_Click"
+                            Content="导入选中版本" />
+                    </StackPanel>
+                    <TextBlock
+                        x:Name="StatusText"
+                        FontSize="12"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        TextWrapping="Wrap" />
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 加载动画：容器正中 -->
+        <ProgressRing
+            x:Name="BusyRing"
+            Width="36"
+            Height="36"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Visibility="Collapsed" />
+    </Grid>
+</Page>

@@ -59,6 +59,8 @@ public sealed partial class VersionSettingsPage : Page
         {
             "launch" => typeof(VersionLaunchSettingsPage),
             "saves" => typeof(VersionSavesPage),
+            "screenshots" => typeof(VersionScreenshotsPage),
+            "packs" => typeof(VersionPacksPage),
             "mods" => typeof(VersionModsPage),
             _ => typeof(VersionGeneralPage),
         };

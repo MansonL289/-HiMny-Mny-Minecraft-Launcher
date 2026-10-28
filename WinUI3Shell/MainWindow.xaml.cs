@@ -109,6 +109,19 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    /// <summary>跳到账号页（首页点击在线账号名时调用）。</summary>
+    public void ShowAccount()
+    {
+        foreach (var obj in NavView.FooterMenuItems)
+        {
+            if (obj is NavigationViewItem navItem && navItem.Tag as string == "Account")
+            {
+                NavView.SelectedItem = navItem;
+                break;
+            }
+        }
+    }
+
     /// <summary>切换整个窗口的主题（ElementTheme.Default 表示跟随系统）。</summary>
     public void ApplyTheme(ElementTheme theme)
     {
@@ -158,6 +171,7 @@ public sealed partial class MainWindow : Window
             page = tag switch
             {
                 "Download.Vanilla" => new DownloadsPage(),
+                "Account" => new AccountPage(),
                 "Mod.Library" => new ModLibraryPage(),
                 "Settings" => new SettingsPage(),
                 _ => new HomePage(),

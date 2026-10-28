@@ -34,7 +34,7 @@ public sealed partial class VersionSavesPage : Page
     private async Task RefreshAsync()
     {
         string dir = SavesDir;
-        StatusText.Text = "正在读取存档...";
+        StatusText.Text = "正在读取存档…";
         List<SaveInfo> list;
         try
         {
@@ -69,7 +69,113 @@ public sealed partial class VersionSavesPage : Page
         Process.Start(new ProcessStartInfo("explorer.exe", $"\"{SavesDir}\"") { UseShellExecute = true });
     }
 
+    private void OpenBackupsDir_Click(object sender, RoutedEventArgs e)
+    {
+        Directory.CreateDirectory(McPaths.BackupsDir);
+        Process.Start(new ProcessStartInfo("explorer.exe", $"\"{McPaths.BackupsDir}\"") { UseShellExecute = true });
+    }
+
     private async void Refresh_Click(object sender, RoutedEventArgs e) => await RefreshAsync();
+
+    // ========== 更多菜单（存档备份 / 导出 / 打开文件夹 / 删除） ==========
+
+    private void MoreSave_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: SaveInfo info } button) return;
+
+        var flyout = new MenuFlyout();
+        var backup = new MenuFlyoutItem { Text = "备份到本地" };
+        backup.Click += async (_, _) => await BackupAsync(info);
+        flyout.Items.Add(backup);
+
+        var export = new MenuFlyoutItem { Text = "导出为 zip" };
+        export.Click += async (_, _) => await ExportAsync(info);
+        flyout.Items.Add(export);
+
+        var open = new MenuFlyoutItem { Text = "打开文件夹" };
+        open.Click += (_, _) =>
+            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{info.SavePath}\"") { UseShellExecute = true });
+        flyout.Items.Add(open);
+
+        flyout.Items.Add(new MenuFlyoutSeparator());
+
+        var delete = new MenuFlyoutItem { Text = "删除" };
+        delete.Click += (_, _) => _ = DeleteConfirmedAsync(info);
+        flyout.Items.Add(delete);
+
+        flyout.ShowAt(button);
+    }
+
+    private async Task BackupAsync(SaveInfo info)
+    {
+        StatusText.Text = "正在备份…";
+        try
+        {
+            string zip = await SaveBackup.BackupAsync(info.SavePath);
+            StatusText.Text = $"已备份：{zip}";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"备份失败: {ex.Message}";
+        }
+    }
+
+    private async Task ExportAsync(SaveInfo info)
+    {
+        var picker = new Windows.Storage.Pickers.FileSavePicker
+        {
+            SuggestedFileName = info.FolderName,
+            SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Desktop,
+        };
+        picker.FileTypeChoices.Add("存档压缩包", new List<string> { ".zip" });
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, App.MainWindow!.Hwnd);
+        var file = await picker.PickSaveFileAsync();
+        if (file == null) return;
+
+        StatusText.Text = "正在导出…";
+        try
+        {
+            await SaveBackup.ExportAsync(info.SavePath, file.Path);
+            StatusText.Text = $"已导出：{file.Path}";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"导出失败: {ex.Message}";
+        }
+    }
+
+    private async void ImportSave_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new Windows.Storage.Pickers.FileOpenPicker
+        {
+            SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Downloads,
+        };
+        picker.FileTypeFilter.Add(".zip");
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, App.MainWindow!.Hwnd);
+        var files = await picker.PickMultipleFilesAsync();
+        if (files == null || files.Count == 0) return;
+
+        StatusText.Text = "正在导入…";
+        int ok = 0;
+        var failed = new List<string>();
+        foreach (var file in files)
+        {
+            try
+            {
+                await SaveBackup.ImportAsync(file.Path, SavesDir);
+                ok++;
+            }
+            catch (Exception ex)
+            {
+                failed.Add($"{file.Name}（{ex.Message}）");
+            }
+        }
+        await RefreshAsync();
+        StatusText.Text = failed.Count == 0
+            ? $"已导入 {ok} 个存档"
+            : $"已导入 {ok} 个，失败 {failed.Count} 个：{string.Join("；", failed)}";
+    }
+
 
     // ========== 查看 ==========
 
@@ -187,9 +293,8 @@ public sealed partial class VersionSavesPage : Page
 
     // ========== 删除 ==========
 
-    private async void DeleteSave_Click(object sender, RoutedEventArgs e)
+    private async Task DeleteConfirmedAsync(SaveInfo info)
     {
-        if (sender is not FrameworkElement { Tag: SaveInfo info }) return;
         var confirm = new ContentDialog
         {
             Title = "删除存档",

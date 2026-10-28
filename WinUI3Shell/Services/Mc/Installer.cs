@@ -284,7 +284,7 @@ public static class Installer
         await Downloader.DownloadManyAsync(
             new[] { jarTask }.Concat(libTasks).ToList(), workers, "核心与依赖库", progress, ct);
 
-        progress?.Report(new McProgress("解压 natives", 0, 0, 0, 0));
+        progress?.Report(new McProgress("解压运行库", 0, 0, 0, 0));
         await Task.Run(() => Libraries.ExtractNatives(natives, Path.Combine(vdir, "natives")), ct);
 
         var logFile = versionJson["logging"]?["client"]?["file"]?.AsObject();

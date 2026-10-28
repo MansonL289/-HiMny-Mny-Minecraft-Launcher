@@ -18,6 +18,8 @@ public static class McPaths
     public static string RuntimesDir => Path.Combine(GameDir, "runtimes");
     /// <summary>MOD 库：下载的 Mod 文件仓库（与具体版本无关）。</summary>
     public static string ModLibraryDir => Path.Combine(GameDir, "modlibrary");
+    /// <summary>存档备份目录。</summary>
+    public static string BackupsDir => Path.Combine(GameDir, "backups", "saves");
 }
 
 /// <summary>下载进度：阶段名、字节进度、文件数进度。</summary>
@@ -120,6 +122,50 @@ public static class Downloader
 {
     private const int Retries = 3;
 
+    // 全局限速状态（所有并发下载共享一个桶，避免 N 个线程各限一份导致总和超限）
+    private static readonly object LimitGate = new();
+    private static long _limitOriginTicks;
+    private static long _limitBytes;
+    private static double _limitCredit;
+
+    /// <summary>按设置的全局限速等待；未限速立即返回。</summary>
+    private static async Task ThrottleAsync(long bytes, CancellationToken ct)
+    {
+        int limitKb = AppSettings.DownloadLimitKb;
+        if (limitKb <= 0 || bytes <= 0) return;
+
+        double limitBytesPerSec = limitKb * 1024.0;
+        double delaySeconds;
+        lock (LimitGate)
+        {
+            long now = Stopwatch.GetTimestamp();
+            if (_limitOriginTicks == 0) _limitOriginTicks = now;
+            // 空闲超过 1 秒就重置窗口，避免长时间暂停后「攒」出一大笔额度瞬间突发
+            double elapsed = (now - _limitOriginTicks) / (double)Stopwatch.Frequency;
+            if (elapsed > 1.0)
+            {
+                _limitOriginTicks = now;
+                _limitBytes = 0;
+                _limitCredit = 0;
+                elapsed = 0;
+            }
+            _limitBytes += bytes;
+            double shouldTake = _limitBytes / limitBytesPerSec;
+            delaySeconds = shouldTake - elapsed + _limitCredit;
+            _limitCredit = 0;
+            if (delaySeconds < 0)
+            {
+                // 跑得比限额快是不允许的：把多出来的时间记成负额度，下次扣回来
+                _limitCredit = delaySeconds;
+                delaySeconds = 0;
+            }
+        }
+        if (delaySeconds > 0)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(delaySeconds), ct);
+        }
+    }
+
     public static bool IsValid(McDownloadTask t)
     {
         if (!File.Exists(t.Dest)) return false;
@@ -212,6 +258,7 @@ public static class Downloader
             while ((n = await input.ReadAsync(buffer, ct)) > 0)
             {
                 await output.WriteAsync(buffer.AsMemory(0, n), ct);
+                await ThrottleAsync(n, ct);
                 onChunk?.Invoke(n);
             }
         }

@@ -49,10 +49,12 @@ public static class LaunchService
         return output;
     }
 
-    /// <summary>按 version.json 的 mainClass/arguments 拼接完整启动命令（离线账号）。
-    /// gameDir 即 ${game_directory} 与进程工作目录；windowWidth/Height 为游戏窗口大小。</summary>
+    /// <summary>按 version.json 的 mainClass/arguments 拼接完整启动命令。
+    /// gameDir 即 ${game_directory} 与进程工作目录；windowWidth/Height 为游戏窗口大小。
+    /// account 为空或离线账号时行为与旧版本一致；第三方账号需要通过 authlibAgent 注入验证服务器。</summary>
     public static List<string> BuildCommand(JsonObject versionJson, string java, string player,
-        string maxMem, string gameDir, int windowWidth = 0, int windowHeight = 0)
+        string maxMem, string gameDir, int windowWidth = 0, int windowHeight = 0,
+        McAccount? account = null, string? authlibAgent = null)
     {
         string id = versionJson["id"]!.GetValue<string>();
         string vdir = McPaths.VersionDir(id);
@@ -66,15 +68,23 @@ public static class LaunchService
         string assetsIndex = versionJson["assets"]?.GetValue<string>()
             ?? versionJson["assetIndex"]?["id"]?.GetValue<string>() ?? "legacy";
 
+        // 正版 / 第三方账号带真实令牌；离线账号沿用旧的离线 UUID 与 "0" 令牌
+        bool online = account != null && account.Type is "microsoft" or "yggdrasil";
+        string playerName = online ? account!.Name : player;
+        string uuid = online ? account!.Uuid : OfflineUuid(player);
+        string token = online ? account!.AccessToken : "0";
+        string userType = account?.Type == "microsoft" ? "msa"
+            : account?.Type == "yggdrasil" ? "mojang" : "legacy";
+
         var values = new Dictionary<string, string>
         {
-            ["auth_player_name"] = player,
-            ["auth_uuid"] = OfflineUuid(player),
-            ["auth_access_token"] = "0",
-            ["auth_session"] = "0", // 旧版 minecraftArguments 使用 ${auth_session}
+            ["auth_player_name"] = playerName,
+            ["auth_uuid"] = uuid,
+            ["auth_access_token"] = token,
+            ["auth_session"] = token, // 旧版 minecraftArguments 使用 ${auth_session}
             ["clientid"] = "0",
             ["auth_xuid"] = "0",
-            ["user_type"] = "legacy", // 离线账号
+            ["user_type"] = userType,
             ["version_name"] = id,
             ["version_type"] = versionJson["type"]?.GetValue<string>() ?? "release",
             ["game_directory"] = gameDir,
@@ -99,6 +109,11 @@ public static class LaunchService
             : null;
 
         var cmd = new List<string> { java, $"-Xmx{maxMem}" };
+        // 第三方登录：javaagent 必须在主类之前；紧跟 -Xmx 插入，位于所有 jvm 参数之前
+        if (!string.IsNullOrEmpty(authlibAgent))
+        {
+            cmd.Add($"-javaagent:{authlibAgent}={account?.ServerUrl ?? ""}");
+        }
         var arguments = versionJson["arguments"]?.AsObject();
         if (arguments != null)
         {

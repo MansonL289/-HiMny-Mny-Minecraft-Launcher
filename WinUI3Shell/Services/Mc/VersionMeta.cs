@@ -23,6 +23,8 @@ public sealed class VersionMeta
     public int MemoryMb { get; set; } = 2048;
     /// <summary>启动后自动加入的服务器地址（host 或 host:port），空 = 不加入。</summary>
     public string AutoJoinServer { get; set; } = "";
+    /// <summary>自定义图标：版本目录下的相对路径（约定 icon.png / icon.ico）；空 = 默认图标。</summary>
+    public string Icon { get; set; } = "";
 
     public const string MetaFileName = "mnymc.json";
 

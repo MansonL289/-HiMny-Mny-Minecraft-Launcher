@@ -147,7 +147,7 @@ public static class ModFlow
                 p.Status, (current + Math.Clamp(p.Fraction, 0, 1)) / targets.Count)));
             try
             {
-                progress.Report(new ModInstallProgress($"安装到 {target.Dir}...", (double)i / targets.Count));
+                progress.Report(new ModInstallProgress($"安装到 {target.Dir}…", (double)i / targets.Count));
                 var chosen = await ResolveTargetVersionAsync(entry, target, sub, ct);
                 if (chosen == null)
                 {

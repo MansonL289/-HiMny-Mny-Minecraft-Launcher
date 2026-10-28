@@ -3,7 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 
 namespace WinUI3Shell.Pages;
 
-/// <summary>设置主页：游戏 / 下载 / 启动器 / 储存 / 关于 五个分类入口。</summary>
+/// <summary>设置主页：游戏 / 下载 / 启动器 / 修复与导入 / 储存 / 关于 六个分类入口。</summary>
 public sealed partial class SettingsHubPage : Page
 {
     public SettingsHubPage()
@@ -16,6 +16,8 @@ public sealed partial class SettingsHubPage : Page
     private void OpenDownload_Click(object sender, RoutedEventArgs e) => Frame.Navigate(typeof(DownloadSettingsPage));
 
     private void OpenLauncher_Click(object sender, RoutedEventArgs e) => Frame.Navigate(typeof(LauncherSettingsPage));
+
+    private void OpenRepair_Click(object sender, RoutedEventArgs e) => Frame.Navigate(typeof(RepairPage));
 
     private void OpenStorage_Click(object sender, RoutedEventArgs e) => Frame.Navigate(typeof(StoragePage));
 

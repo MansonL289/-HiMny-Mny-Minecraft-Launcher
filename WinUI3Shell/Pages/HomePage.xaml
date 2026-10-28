@@ -20,14 +20,16 @@
             <Grid Width="56" Height="56" HorizontalAlignment="Center">
                 <!-- 阴影承载层：放在头像后面，只露出下方偏移的阴影 -->
                 <Border x:Name="AvatarShadowHost" />
+                <!-- 默认头像（Head.png）；在线账号时由上层 Image 覆盖成皮肤头 -->
                 <Border
                     x:Name="AvatarBorder"
                     Width="56"
-                    Height="56">
-                    <Border.Background>
-                        <ImageBrush ImageSource="ms-appx:///Assets/Head.png" Stretch="UniformToFill" />
-                    </Border.Background>
-                </Border>
+                    Height="56" />
+                <Image
+                    x:Name="AvatarImage"
+                    Stretch="UniformToFill"
+                    Visibility="Collapsed"
+                    ImageFailed="AvatarImage_ImageFailed" />
             </Grid>
 
             <Grid HorizontalAlignment="Center">
@@ -54,29 +56,46 @@
             </Grid>
         </StackPanel>
 
-        <!-- 启动状态：进度条 + 状态文字（仅启动流程中显示） -->
-        <StackPanel
-            x:Name="LaunchProgressPanel"
-            Grid.Row="1"
-            Margin="0,0,0,12"
-            Spacing="4"
-            Visibility="Collapsed">
-            <ProgressBar x:Name="LaunchProgress" IsIndeterminate="True" />
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBlock
-                    x:Name="LaunchStatus"
-                    VerticalAlignment="Center"
-                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    TextTrimming="CharacterEllipsis" />
-                <Button
-                    x:Name="CancelLaunchButton"
-                    Grid.Column="1"
-                    Padding="12,2"
-                    Click="CancelLaunch_Click"
-                    Content="取消"
-                    FontSize="12"
-                    Visibility="Collapsed" />
-            </Grid>
+        <!-- 右上角：查看日志（读 latest.log / 崩溃报告并给出结论） -->
+        <Button
+            Grid.Row="0"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Top"
+            Padding="12,4"
+            FontSize="12"
+            Content="日志"
+            Click="LogButton_Click" />
+
+        <!-- 游玩统计 + 启动状态：进度条仅在启动流程中显示 -->
+        <StackPanel Grid.Row="1" Spacing="4">
+            <TextBlock
+                x:Name="PlaytimeText"
+                FontSize="12"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                TextTrimming="CharacterEllipsis"
+                Visibility="Collapsed" />
+            <StackPanel
+                x:Name="LaunchProgressPanel"
+                Margin="0,0,0,12"
+                Spacing="4"
+                Visibility="Collapsed">
+                <ProgressBar x:Name="LaunchProgress" IsIndeterminate="True" />
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock
+                        x:Name="LaunchStatus"
+                        VerticalAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        TextTrimming="CharacterEllipsis" />
+                    <Button
+                        x:Name="CancelLaunchButton"
+                        Grid.Column="1"
+                        Padding="12,2"
+                        Click="CancelLaunch_Click"
+                        Content="取消"
+                        FontSize="12"
+                        Visibility="Collapsed" />
+                </Grid>
+            </StackPanel>
         </StackPanel>
 
         <!-- 底部：左侧版本设置 + 下拉框，右侧启动按钮 -->

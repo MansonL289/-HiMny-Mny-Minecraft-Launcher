@@ -75,6 +75,54 @@ public sealed partial class VersionGeneralPage : Page
         Shell.SaveMeta();
     }
 
+    // ========== 自定义图标 ==========
+
+    private async void ChangeIcon_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new FileOpenPicker
+        {
+            SuggestedStartLocation = PickerLocationId.PicturesLibrary,
+        };
+        picker.FileTypeFilter.Add(".png");
+        picker.FileTypeFilter.Add(".ico");
+        picker.FileTypeFilter.Add(".jpg");
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, App.MainWindow!.Hwnd);
+        var file = await picker.PickSingleFileAsync();
+        if (file == null) return;
+
+        try
+        {
+            string dest = Path.Combine(VersionMeta.DirPath(Shell.Dir), "icon.png");
+            File.Copy(file.Path, dest, true);
+            Shell.Meta.Icon = "icon.png";
+            Shell.SaveMeta();
+            StatusText.Text = $"已使用 {file.Name} 作为版本图标。";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"更改图标失败: {ex.Message}";
+        }
+    }
+
+    private void ClearIcon_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            foreach (string name in new[] { "icon.png", "icon.ico" })
+            {
+                string path = Path.Combine(VersionMeta.DirPath(Shell.Dir), name);
+                if (File.Exists(path)) File.Delete(path);
+            }
+            Shell.Meta.Icon = "";
+            Shell.SaveMeta();
+            StatusText.Text = "已清除自定义图标，恢复默认图标。";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"清除图标失败: {ex.Message}";
+        }
+    }
+
     // ========== 快捷方式 ==========
 
     private static void OpenFolder(string path, bool createIfMissing)

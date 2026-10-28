@@ -183,6 +183,6 @@ public sealed partial class ModLibraryPage : Page
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
         _job?.Cts.Cancel();
-        StatusText.Text = "正在取消...";
+        StatusText.Text = "正在取消…";
     }
 }

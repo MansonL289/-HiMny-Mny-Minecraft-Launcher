@@ -190,7 +190,7 @@ public sealed partial class ManualDownloadPage : Page
             return;
         }
 
-        StatusText.Text = "正在下载...";
+        StatusText.Text = "正在下载…";
         try
         {
             await Downloader.DownloadManyAsync(
