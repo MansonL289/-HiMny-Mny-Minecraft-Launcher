@@ -28,6 +28,7 @@
                 <RadioButton x:Name="FabricRadio" Content="Fabric（自动安装）" />
                 <RadioButton x:Name="ForgeRadio" Content="Forge（自动安装）" />
                 <RadioButton x:Name="NeoForgeRadio" Content="NeoForge（自动安装）" />
+                <RadioButton x:Name="QuiltRadio" Content="Quilt（自动安装）" />
             </RadioButtons>
 
             <!-- 选择加载器后可手动挑版本，默认自动选最新 -->

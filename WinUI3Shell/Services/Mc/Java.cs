@@ -23,13 +23,34 @@ public static class JavaService
         return legacy ? (8, 8) : (major, int.MaxValue);
     }
 
-    /// <summary>找到主版本号在 [minMajor, maxMajor] 内的 Java；找不到就自动下载并返回路径。</summary>
+    /// <summary>找到主版本号在 [minMajor, maxMajor] 内的 Java；找不到就自动下载并返回路径。
+    /// 设置里指定的全局默认 Java 版本合适时优先使用。</summary>
     public static async Task<string> EnsureAsync(int minMajor, int maxMajor,
         IProgress<McProgress>? progress, CancellationToken ct = default)
     {
+        string global = AppSettings.GlobalJavaPath;
+        if (!string.IsNullOrEmpty(global) && File.Exists(global))
+        {
+            int? major = await GetMajorAsync(global);
+            if (major >= minMajor && major <= maxMajor) return global;
+        }
         var found = await FindSuitableAsync(minMajor, maxMajor);
         if (found != null) return found;
         return await DownloadAsync(minMajor, progress, ct);
+    }
+
+    /// <summary>扫描本机所有可用 Java（下载的运行时 / JAVA_HOME / PATH / 常见安装目录）。</summary>
+    public static async Task<List<(string Path, int Major)>> ScanAllAsync()
+    {
+        var result = new List<(string, int)>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var candidate in Candidates())
+        {
+            if (!seen.Add(candidate)) continue;
+            int? major = await GetMajorAsync(candidate);
+            if (major.HasValue) result.Add((candidate, major.Value));
+        }
+        return result;
     }
 
     /// <summary>遍历候选 java.exe，运行 -version 解析主版本号，返回第一个满足要求的。</summary>
@@ -115,7 +136,7 @@ public static class JavaService
     }
 
     /// <summary>从 Adoptium 下载指定主版本的 Windows x64 JRE 并解压到 runtimes/。</summary>
-    private static async Task<string> DownloadAsync(int major,
+    public static async Task<string> DownloadAsync(int major,
         IProgress<McProgress>? progress, CancellationToken ct)
     {
         string url = $"https://api.adoptium.net/v3/binary/latest/{major}/ga/windows/x64/jre/hotspot/normal/eclipse";

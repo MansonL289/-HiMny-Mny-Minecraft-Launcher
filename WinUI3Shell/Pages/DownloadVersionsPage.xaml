@@ -33,7 +33,29 @@
             <ListView
                 x:Name="VersionList"
                 IsItemClickEnabled="True"
-                ItemClick="VersionList_ItemClick" />
+                ItemClick="VersionList_ItemClick">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" Padding="0,6">
+                            <Grid Width="36" Height="36" VerticalAlignment="Center">
+                                <Image
+                                    Width="28"
+                                    Height="28"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Source="{Binding IconUrl}"
+                                    Stretch="Uniform" />
+                            </Grid>
+                            <TextBlock
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource BodyStrongTextBlockStyle}"
+                                Text="{Binding Id}"
+                                TextTrimming="CharacterEllipsis" />
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
             <ProgressRing
                 x:Name="LoadingRing"
                 Width="36"

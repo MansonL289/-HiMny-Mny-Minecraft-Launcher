@@ -23,6 +23,10 @@ public sealed class VersionMeta
     public int MemoryMb { get; set; } = 2048;
     /// <summary>启动后自动加入的服务器地址（host 或 host:port），空 = 不加入。</summary>
     public string AutoJoinServer { get; set; } = "";
+    /// <summary>追加的 JVM 参数（每行一个，如 -XX:+UseG1GC）。</summary>
+    public string ExtraJvmArgs { get; set; } = "";
+    /// <summary>追加的游戏参数（每行一个，如 --fullscreen）。</summary>
+    public string ExtraGameArgs { get; set; } = "";
     /// <summary>自定义图标：版本目录下的相对路径（约定 icon.png / icon.ico）；空 = 默认图标。</summary>
     public string Icon { get; set; } = "";
 
@@ -138,6 +142,11 @@ public sealed class VersionMeta
                         return "NeoForge " + LastCoordinatePart(name);
                     if (name.StartsWith("net.minecraftforge:forge:", StringComparison.OrdinalIgnoreCase))
                         return "Forge " + LastCoordinatePart(name);
+                    // OptiFine / LiteLoader 也走 launchwrapper，先按库坐标识别，避免被认成 Forge
+                    if (name.StartsWith("optifine:OptiFine:", StringComparison.OrdinalIgnoreCase))
+                        return "OptiFine " + LastCoordinatePart(name);
+                    if (name.StartsWith("com.mumfrey:liteloader:", StringComparison.OrdinalIgnoreCase))
+                        return "LiteLoader " + LastCoordinatePart(name);
                 }
                 // 现代 Forge/NeoForge 可能只带 fmlloader / fancymodloader 等坐标
                 foreach (var node in libraries)

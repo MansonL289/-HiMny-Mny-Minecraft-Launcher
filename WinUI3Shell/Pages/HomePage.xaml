@@ -45,6 +45,18 @@
             </Grid>
         </StackPanel>
 
+        <!-- 愚人节彩蛋：中间下方提示文字（仅 4 月 1 日显示） -->
+        <TextBlock
+            x:Name="SurrenderHint"
+            Grid.Row="0"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Bottom"
+            Margin="0,0,0,24"
+            FontSize="18"
+            FontWeight="SemiBold"
+            Text="快快投降，不然你别想玩了"
+            Visibility="Collapsed" />
+
         <!-- 游玩统计 + 启动状态：进度条仅在启动流程中显示 -->
         <StackPanel Grid.Row="1" Spacing="4">
             <TextBlock
@@ -76,6 +88,20 @@
                 </Grid>
             </StackPanel>
         </StackPanel>
+
+        <!-- 愚人节彩蛋：右下角投降按钮（仅 4 月 1 日显示）。放在底部 Grid 之前，使它藏在启动按钮后面；右、下边距相等。 -->
+        <Button
+            x:Name="SurrenderButton"
+            Grid.Row="2"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Bottom"
+            Margin="0,0,0,0"
+            Padding="10,4"
+            Visibility="Collapsed"
+            ToolTipService.ToolTip="投降"
+            Click="SurrenderButton_Click">
+            <FontIcon Glyph="&#xE7C1;" FontSize="16" />
+        </Button>
 
         <!-- 底部：左侧版本设置 + 下拉框，右侧启动按钮 -->
         <Grid Grid.Row="2">

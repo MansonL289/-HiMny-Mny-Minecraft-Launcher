@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WinUI3Shell.Pages.JavaPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Loaded="JavaPage_Loaded">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <Grid Padding="24" RowDefinitions="Auto,*,Auto">
+        <!-- 工具栏 -->
+        <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button
+                x:Name="ScanButton"
+                Click="Scan_Click"
+                ToolTipService.ToolTip="扫描本机 Java">
+                <SymbolIcon Symbol="Refresh" />
+            </Button>
+            <Button
+                x:Name="AddButton"
+                Click="AddJava_Click"
+                Content="添加 Java…" />
+            <Button
+                x:Name="DownloadButton"
+                Content="下载 Java">
+                <Button.Flyout>
+                    <MenuFlyout>
+                        <MenuFlyoutItem
+                            Text="Java 8"
+                            Tag="8"
+                            Click="DownloadJava_Click" />
+                        <MenuFlyoutItem
+                            Text="Java 17"
+                            Tag="17"
+                            Click="DownloadJava_Click" />
+                        <MenuFlyoutItem
+                            Text="Java 21"
+                            Tag="21"
+                            Click="DownloadJava_Click" />
+                        <MenuFlyoutItem
+                            Text="Java 25"
+                            Tag="25"
+                            Click="DownloadJava_Click" />
+                    </MenuFlyout>
+                </Button.Flyout>
+            </Button>
+        </StackPanel>
+
+        <!-- Java 列表 + 空状态 -->
+        <Grid Grid.Row="1" Margin="0,12,0,0">
+            <ListView x:Name="JavaList" SelectionMode="None">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid
+                            Padding="0,8"
+                            ColumnDefinitions="*,Auto,Auto"
+                            ColumnSpacing="12">
+                            <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                                <TextBlock
+                                    Style="{StaticResource BodyStrongTextBlockStyle}"
+                                    Text="{Binding Title}"
+                                    TextTrimming="CharacterEllipsis" />
+                                <TextBlock
+                                    FontSize="12"
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="{Binding FilePath}"
+                                    TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <TextBlock
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                FontSize="12"
+                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                Text="默认"
+                                Visibility="{Binding DefaultVisibility}" />
+                            <Button
+                                Grid.Column="2"
+                                VerticalAlignment="Center"
+                                Click="SetDefault_Click"
+                                Content="设为默认"
+                                Tag="{Binding}"
+                                Visibility="{Binding SetVisibility}" />
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <StackPanel
+                x:Name="EmptyHint"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Spacing="8"
+                Visibility="Collapsed">
+                <FontIcon
+                    Glyph="&#xE943;"
+                    FontSize="36"
+                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                    HorizontalAlignment="Center" />
+                <TextBlock
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    HorizontalAlignment="Center"
+                    Text="没有找到 Java，可点「下载 Java」" />
+            </StackPanel>
+
+            <!-- 加载动画：容器正中 -->
+            <ProgressRing
+                x:Name="BusyRing"
+                Width="36"
+                Height="36"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Visibility="Collapsed" />
+        </Grid>
+
+        <TextBlock
+            x:Name="StatusText"
+            Grid.Row="2"
+            Margin="0,8,0,0"
+            FontSize="12"
+            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+            TextWrapping="Wrap" />
+    </Grid>
+    </ScrollViewer>
+</Page>

@@ -12,6 +12,12 @@ public partial class App : Application
     /// <summary>当前主窗口，供页面访问窗口级操作（如切换主题）。</summary>
     public static MainWindow? MainWindow { get; private set; }
 
+    /// <summary>命令行 --launch 指定的版本名（桌面快捷方式用），空表示正常启动。</summary>
+    public static string StartupVersion { get; private set; } = "";
+
+    /// <summary>取走 --launch 参数，避免页面多次加载时重复自动启动。</summary>
+    public static void ConsumeStartupVersion() => StartupVersion = "";
+
     public App()
     {
         InitializeComponent();
@@ -19,6 +25,15 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        // 桌面快捷方式传入：--launch "版本名"，启动后自动进入该版本
+        var cli = Environment.GetCommandLineArgs();
+        int launchIndex = Array.FindIndex(cli, a =>
+            a.Equals("--launch", StringComparison.OrdinalIgnoreCase));
+        if (launchIndex >= 0 && launchIndex + 1 < cli.Length)
+        {
+            StartupVersion = cli[launchIndex + 1];
+        }
+
         // 断点不续传：上次启动被关掉/强杀留下的半截下载（.part）直接清空
         _ = System.Threading.Tasks.Task.Run(Services.Mc.Downloader.CleanupPartialDownloads);
 
@@ -72,6 +87,27 @@ public static class AppSettings
                 key.DeleteValue(RunValueName, false);
             }
         }
+    }
+
+    /// <summary>全局默认 Java 路径；空 = 自动选择。</summary>
+    public static string GlobalJavaPath
+    {
+        get => GetString("GlobalJavaPath") ?? "";
+        set => SetString("GlobalJavaPath", value);
+    }
+
+    /// <summary>网络代理（如 http://127.0.0.1:7890）；空 = 不使用代理。</summary>
+    public static string ProxyUrl
+    {
+        get => GetString("ProxyUrl") ?? "";
+        set => SetString("ProxyUrl", value);
+    }
+
+    /// <summary>CurseForge API Key（用户自备）；空 = CurseForge 源不可用。</summary>
+    public static string CurseForgeKey
+    {
+        get => GetString("CurseForgeKey") ?? "";
+        set => SetString("CurseForgeKey", value);
     }
 
     /// <summary>下载镜像：auto（断点换源）/ bmclapi / official，启动页补下载文件也用此源。</summary>

@@ -49,10 +49,20 @@
                 Margin="0,14,0,0"
                 Style="{StaticResource BodyStrongTextBlockStyle}"
                 Text="高级" />
-            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
-                <Button Click="ExportScript_Click" Content="导出启动脚本" />
-                <Button Click="Delete_Click" Content="删除版本" Foreground="#FF6363" />
-            </StackPanel>
+            <Grid>
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
+                    <Button x:Name="ExportScriptButton" Click="ExportScript_Click" Content="导出启动脚本" />
+                    <Button x:Name="ExportPackButton" Click="ExportPack_Click" Content="导出整合包" />
+                    <Button Click="Delete_Click" Content="删除版本" Foreground="#FF6363" />
+                </StackPanel>
+                <ProgressRing
+                    x:Name="ExportRing"
+                    Width="32"
+                    Height="32"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Visibility="Collapsed" />
+            </Grid>
         </StackPanel>
     </ScrollViewer>
 </Page>

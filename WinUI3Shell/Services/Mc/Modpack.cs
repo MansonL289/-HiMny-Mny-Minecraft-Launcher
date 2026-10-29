@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 
 namespace WinUI3Shell.Services.Mc;
@@ -13,7 +14,7 @@ public sealed class ModpackFile
     public long Size { get; set; }
 }
 
-/// <summary>解析后的整合包信息（Modrinth .mrpack）。</summary>
+/// <summary>解析后的整合包信息（Modrinth .mrpack 或 CurseForge .zip）。</summary>
 public sealed class ModpackInfo
 {
     public string ZipPath { get; set; } = "";
@@ -24,6 +25,10 @@ public sealed class ModpackInfo
     public string LoaderKind { get; set; } = "";
     public string? LoaderVersion { get; set; }
     public List<ModpackFile> Files { get; set; } = new();
+    /// <summary>是否为 CurseForge 整合包（manifest.json）。</summary>
+    public bool IsCurseForge { get; init; }
+    /// <summary>CurseForge manifest 里的 (projectID, fileID)，安装时再查真实下载地址。</summary>
+    public List<(int ModId, int FileId)> CfFiles { get; init; } = new();
 
     public string LoaderText => LoaderKind switch
     {
@@ -37,7 +42,7 @@ public sealed class ModpackInfo
     public string SummaryText => $"{LoaderText} {LoaderVersion} · Minecraft {McVersion} · {Files.Count} 个文件";
 }
 
-/// <summary>读取 .mrpack 的 modrinth.index.json。</summary>
+/// <summary>读取整合包：优先 Modrinth 的 modrinth.index.json，其次 CurseForge 的 manifest.json。</summary>
 public static class Modpack
 {
     public static ModpackInfo Load(string zipPath)
@@ -46,10 +51,9 @@ public static class Modpack
         var entry = zip.GetEntry("modrinth.index.json");
         if (entry == null)
         {
-            bool curseForge = zip.GetEntry("manifest.json") != null;
-            throw new InvalidDataException(curseForge
-                ? "这是 CurseForge 整合包（manifest.json），需要 CurseForge API Key，目前只支持 Modrinth 的 .mrpack。"
-                : "压缩包里没有 modrinth.index.json，不是 Modrinth 整合包。");
+            var cfEntry = zip.GetEntry("manifest.json");
+            if (cfEntry != null) return LoadCurseForge(zipPath, cfEntry);
+            throw new InvalidDataException("压缩包里没有 modrinth.index.json，不是 Modrinth 整合包。");
         }
 
         using var stream = entry.Open();
@@ -111,6 +115,75 @@ public static class Modpack
             });
         }
 
+        return info;
+    }
+
+    /// <summary>读取 CurseForge 整合包的 manifest.json：只有 projectID/fileID，真实下载地址安装时再查。</summary>
+    private static ModpackInfo LoadCurseForge(string zipPath, ZipArchiveEntry entry)
+    {
+        JsonObject manifest;
+        using (var stream = entry.Open())
+        using (var reader = new StreamReader(stream))
+        {
+            try
+            {
+                manifest = JsonNode.Parse(reader.ReadToEnd())?.AsObject()
+                    ?? throw new InvalidDataException("CurseForge manifest.json 内容为空。");
+            }
+            catch (JsonException)
+            {
+                throw new InvalidDataException("CurseForge 整合包的 manifest.json 格式不正确。");
+            }
+        }
+
+        var minecraft = manifest["minecraft"]?.AsObject();
+        string mc = minecraft?["version"]?.GetValue<string>() ?? "";
+        if (string.IsNullOrEmpty(mc)) throw new InvalidDataException("整合包没有声明 Minecraft 版本。");
+
+        // modLoaders[0].id 形如 forge-47.2.0 / fabric-0.15.0 / neoforge-21.1.0
+        string loaderKind = "";
+        string? loaderVersion = null;
+        string loaderId = minecraft?["modLoaders"]?.AsArray()?.FirstOrDefault()?["id"]?.GetValue<string>() ?? "";
+        int dash = loaderId.IndexOf('-');
+        if (dash > 0)
+        {
+            loaderKind = loaderId[..dash].ToLowerInvariant() switch
+            {
+                "forge" => "forge",
+                "fabric" => "fabric",
+                "neoforge" => "neoforge",
+                "quilt" => "quilt",
+                _ => "",
+            };
+            if (loaderKind.Length > 0) loaderVersion = loaderId[(dash + 1)..];
+        }
+
+        var cfFiles = new List<(int ModId, int FileId)>();
+        foreach (var node in manifest["files"]?.AsArray() ?? new JsonArray())
+        {
+            if (node is not JsonObject file) continue;
+            int projectId = file["projectID"]?.GetValue<int>() ?? 0;
+            int fileId = file["fileID"]?.GetValue<int>() ?? 0;
+            if (projectId <= 0 || fileId <= 0) continue;
+            cfFiles.Add((projectId, fileId));
+        }
+
+        var info = new ModpackInfo
+        {
+            ZipPath = zipPath,
+            Name = manifest["name"]?.GetValue<string>() ?? Path.GetFileNameWithoutExtension(zipPath),
+            Version = manifest["version"]?.GetValue<string>() ?? "",
+            McVersion = mc,
+            LoaderKind = loaderKind,
+            LoaderVersion = loaderVersion,
+            IsCurseForge = true,
+            CfFiles = cfFiles,
+        };
+        // 占位文件：真实文件名/地址在安装时查询；只用于预览数量
+        foreach (var (modId, fileId) in cfFiles)
+        {
+            info.Files.Add(new ModpackFile { RelPath = $"mods/pending-{modId}-{fileId}.jar" });
+        }
         return info;
     }
 

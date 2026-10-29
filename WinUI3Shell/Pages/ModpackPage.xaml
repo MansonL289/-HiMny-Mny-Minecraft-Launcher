@@ -69,7 +69,7 @@
                     x:Name="EmptyText"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                     HorizontalAlignment="Center"
-                    Text="选择一个 .mrpack 整合包开始安装" />
+                    Text="选择一个 .mrpack 或 CurseForge .zip 整合包开始安装" />
             </StackPanel>
 
             <!-- 加载动画：容器正中 -->

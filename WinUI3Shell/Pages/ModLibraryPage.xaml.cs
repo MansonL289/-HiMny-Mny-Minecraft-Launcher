@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,6 +10,29 @@ using Microsoft.UI.Xaml.Controls;
 using WinUI3Shell.Services.Mc;
 
 namespace WinUI3Shell.Pages;
+
+/// <summary>库中的一个版本项。</summary>
+public sealed class VersionItem
+{
+    public string Name { get; set; } = "";
+    public string Loader { get; set; } = "";
+
+    /// <summary>根据加载器类型返回对应的 3D 图标 URI。</summary>
+    public string IconUrl
+    {
+        get
+        {
+            string l = Loader ?? "";
+            if (l.StartsWith("NeoForge", StringComparison.OrdinalIgnoreCase)) return "ms-appx:///Assets/icon_neoforge.png";
+            if (l.StartsWith("Forge", StringComparison.OrdinalIgnoreCase)) return "ms-appx:///Assets/icon_forge.png";
+            if (l.StartsWith("Fabric", StringComparison.OrdinalIgnoreCase)) return "ms-appx:///Assets/icon_fabric.png";
+            if (l.StartsWith("Quilt", StringComparison.OrdinalIgnoreCase)) return "ms-appx:///Assets/icon_quilt.png";
+            if (l.StartsWith("OptiFine", StringComparison.OrdinalIgnoreCase)) return "ms-appx:///Assets/icon_optifine.png";
+            if (l.StartsWith("LiteLoader", StringComparison.OrdinalIgnoreCase)) return "ms-appx:///Assets/icon_liteloader.png";
+            return "ms-appx:///Assets/icon_vanilla.png";
+        }
+    }
+}
 
 /// <summary>库列表项：一个 Mod（可能有多份不同加载器/版本的文件）。</summary>
 public sealed class ModLibraryItem
@@ -19,28 +43,103 @@ public sealed class ModLibraryItem
     public string DetailText { get; set; } = "";
 }
 
-/// <summary>MOD 库：所有下载过的 Mod，可随时安装到带加载器的版本。</summary>
+/// <summary>库：已安装的版本、下载的 Mod、以及各加载器安装情况。</summary>
 public sealed partial class ModLibraryPage : Page
 {
     private readonly ObservableCollection<ModLibraryItem> _items = new();
+    private readonly ObservableCollection<VersionItem> _versions = new();
     private bool _busy;
     private int _refreshSeq;
 
     public ModLibraryPage()
     {
         InitializeComponent();
-        // 主窗口用手动页面缓存（直接赋值 Content，不触发 OnNavigatedTo），
-        // 每次切回本页都会触发 Loaded，借此自动刷新
-        Loaded += (_, _) => RefreshList();
+        Loaded += (_, _) => RefreshAll();
     }
 
-    private async void RefreshList()
+    private void RefreshAll()
+    {
+        RefreshVersions();
+        RefreshMods();
+        RefreshLoaders();
+    }
+
+    // ===== 版本 =====
+
+    private void RefreshVersions()
+    {
+        _versions.Clear();
+        if (Directory.Exists(McPaths.VersionsDir))
+        {
+            var dirs = Directory.GetDirectories(McPaths.VersionsDir)
+                .Select(d => Path.GetFileName(d)!)
+                .OrderByDescending(n => n)
+                .ToList();
+            foreach (var dir in dirs)
+            {
+                var meta = VersionMeta.Load(dir);
+                if (meta == null) continue;
+                string loader = meta.LoaderType(dir);
+                _versions.Add(new VersionItem
+                {
+                    Name = dir,
+                    Loader = loader.Length > 0 ? loader : "原版",
+                });
+            }
+        }
+        VersionList.ItemsSource = _versions;
+        VersionEmpty.Visibility = _versions.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        VersionList.Visibility = _versions.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void OpenVersionFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string name }) return;
+        string path = VersionMeta.DirPath(name);
+        if (Directory.Exists(path)) Process.Start("explorer.exe", path);
+    }
+
+    private async void DeleteVersion_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string name }) return;
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "删除版本",
+            Content = $"确定删除版本「{name}」吗？此操作不可撤销。",
+            PrimaryButtonText = "删除",
+            CloseButtonText = "取消",
+        };
+        var result = await dialog.ShowAsync();
+        if (result != ContentDialogResult.Primary) return;
+        try
+        {
+            string dir = VersionMeta.DirPath(name);
+            if (Directory.Exists(dir)) Directory.Delete(dir, true);
+            RefreshVersions();
+            RefreshLoaders();
+        }
+        catch (Exception ex)
+        {
+            var tip = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = "删除失败",
+                Content = ex.Message,
+                CloseButtonText = "好",
+            };
+            await tip.ShowAsync();
+        }
+    }
+
+    // ===== MOD =====
+
+    private async void RefreshMods()
     {
         int seq = ++_refreshSeq;
         var entries = ModLibrary.Load().OrderBy(e => e.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
         var originals = entries.Select(e => e.Name).ToList();
         var known = originals.Select(ModNames.Zh).ToList();
-        // 常用 Mod 的中文名立即生效（不联网）
         for (int i = 0; i < entries.Count; i++)
         {
             if (known[i].Length > 0)
@@ -51,16 +150,14 @@ public sealed partial class ModLibraryPage : Page
         Rebind(entries, null);
         ModList.ItemsSource = _items;
 
-        // 后台并行：扫描各 Mod 的 jar 是否带中文语言文件 + 把英文名翻成中文，完成后刷新
         var zhTask = Task.Run(() => entries.ToDictionary(
             e => e.Id,
             e => e.Files.Any(f => ModLang.SupportsChinese(Path.Combine(ModLibrary.DirFor(e.Id), f.FileName))),
             StringComparer.OrdinalIgnoreCase));
         var namesTask = Translator.ToChineseAsync(
             Enumerable.Range(0, originals.Count).Select(i => known[i].Length > 0 ? "" : originals[i]).ToList(),
-            CancellationToken.None);
+            System.Threading.CancellationToken.None);
         await Task.WhenAll(zhTask, namesTask);
-        // 连续切页触发的刷新只认最后一次，避免旧结果覆盖新列表
         if (seq != _refreshSeq) return;
         var zh = zhTask.Result;
         for (int i = 0; i < entries.Count && i < namesTask.Result.Count; i++)
@@ -89,7 +186,6 @@ public sealed partial class ModLibraryPage : Page
         bool empty = _items.Count == 0;
         EmptyHint.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
         ModList.Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
-        StatusText.Text = empty ? "" : $"共 {_items.Count} 个 Mod";
     }
 
     private static string Detail(ModLibraryEntry entry, bool supportsChinese = false)
@@ -98,36 +194,20 @@ public sealed partial class ModLibraryPage : Page
             .Select(f => $"{ModFlow.LoaderName(f.Loader)} {f.McVersion}")
             .Distinct(StringComparer.OrdinalIgnoreCase);
         string text = string.Join(" · ", flavors);
-        if (supportsChinese)
-        {
-            text += " · 支持中文";
-        }
+        if (supportsChinese) text += " · 支持中文";
         return string.IsNullOrEmpty(entry.Author) ? text : $"{entry.Author} · {text}";
     }
 
-    private void Refresh_Click(object sender, RoutedEventArgs e) => RefreshList();
-
-    /// <summary>安装到版本（需要补下文件时也作为全局下载任务，可在「下载任务」里看进度）。</summary>
     private async void Install_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { Tag: ModLibraryItem item } || _busy) return;
-        if (DownloadManager.IsModBusy(item.Entry.Name))
-        {
-            StatusText.Text = "这个 Mod 正在处理中";
-            return;
-        }
+        if (DownloadManager.IsModBusy(item.Entry.Name)) return;
 
         var targets = await ModFlow.PickTargetsAsync(XamlRoot);
         if (targets == null || targets.Count == 0) return;
 
         _busy = true;
-        InstallBar.Value = 0;
-        InstallBar.Visibility = Visibility.Visible;
-        CancelButton.Visibility = Visibility.Visible;
-        StatusText.Text = "";
-
         var entry = item.Entry;
-        _outcomes = null;
         _job = DownloadManager.StartMod(entry.Name, async (job, ct) =>
         {
             var reporter = new Progress<ModInstallProgress>(p =>
@@ -138,7 +218,6 @@ public sealed partial class ModLibraryPage : Page
             DownloadManager.Report(job, $"已安装到 {ok} 个版本", 1);
         });
         DownloadManager.JobsChanged += OnJobChanged;
-        // 任务可能在订阅前就结束（极小概率），主动同步一次
         OnJobChanged(null, EventArgs.Empty);
     }
 
@@ -151,12 +230,8 @@ public sealed partial class ModLibraryPage : Page
         if (job == null) return;
         DispatcherQueue.TryEnqueue(async () =>
         {
-            StatusText.Text = job.StatusText;
-            InstallBar.Value = Math.Clamp(job.Fraction, 0, 1);
             if (!job.Done) return;
             DownloadManager.JobsChanged -= OnJobChanged;
-            InstallBar.Visibility = Visibility.Collapsed;
-            CancelButton.Visibility = Visibility.Collapsed;
             _busy = false;
             _job = null;
             var failed = _outcomes?.Where(o => !o.Ok).ToList() ?? new();
@@ -177,12 +252,75 @@ public sealed partial class ModLibraryPage : Page
         bool empty = _items.Count == 0;
         EmptyHint.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
         ModList.Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
-        StatusText.Text = empty ? "" : $"共 {_items.Count} 个 Mod";
     }
 
-    private void Cancel_Click(object sender, RoutedEventArgs e)
+    // ===== 安装器：按加载器分类展示已安装该加载器的版本 =====
+
+    private void RefreshLoaders()
     {
-        _job?.Cts.Cancel();
-        StatusText.Text = "正在取消…";
+        string? tag = null;
+        if (SideBar.SelectedItem is NavigationViewItem item)
+        {
+            tag = item.Tag?.ToString();
+        }
+
+        IEnumerable<VersionItem> filtered;
+        if (string.IsNullOrEmpty(tag) || tag == "loaders")
+        {
+            // 父栏目「安装器」：展示所有安装了加载器的版本
+            filtered = _versions.Where(v => v.Loader != "原版");
+        }
+        else
+        {
+            string loaderName = tag switch
+            {
+                "forge" => "Forge",
+                "fabric" => "Fabric",
+                "neoforge" => "NeoForge",
+                "quilt" => "Quilt",
+                "optifine" => "OptiFine",
+                "liteloader" => "LiteLoader",
+                _ => tag,
+            };
+            filtered = _versions.Where(v => v.Loader.StartsWith(loaderName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var list = filtered.ToList();
+        LoaderList.ItemsSource = list;
+        bool empty = list.Count == 0;
+        LoaderEmpty.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
+        LoaderList.Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
     }
+
+    private void SideBar_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+    {
+        if (args.SelectedItemContainer is not NavigationViewItem item) return;
+        string tag = item.Tag?.ToString() ?? "";
+
+        switch (tag)
+        {
+            case "versions":
+                TitleText.Text = "版本";
+                VersionsPanel.Visibility = Visibility.Visible;
+                ModsPanel.Visibility = Visibility.Collapsed;
+                LoaderPanel.Visibility = Visibility.Collapsed;
+                break;
+            case "mods":
+                TitleText.Text = "MOD";
+                VersionsPanel.Visibility = Visibility.Collapsed;
+                ModsPanel.Visibility = Visibility.Visible;
+                LoaderPanel.Visibility = Visibility.Collapsed;
+                break;
+            default:
+                // loaders 父栏目或具体加载器子栏目
+                TitleText.Text = tag == "loaders" ? "安装器" : (item.Content?.ToString() ?? "安装器");
+                VersionsPanel.Visibility = Visibility.Collapsed;
+                ModsPanel.Visibility = Visibility.Collapsed;
+                LoaderPanel.Visibility = Visibility.Visible;
+                RefreshLoaders();
+                break;
+        }
+    }
+
+    private void Refresh_Click(object sender, RoutedEventArgs e) => RefreshAll();
 }

@@ -148,6 +148,54 @@ public sealed partial class VersionGeneralPage : Page
 
     // ========== 高级 ==========
 
+    /// <summary>把当前版本导出成 Modrinth 整合包（.mrpack）。</summary>
+    private async void ExportPack_Click(object sender, RoutedEventArgs e)
+    {
+        string note = "";
+        try
+        {
+            var picker = new FileSavePicker
+            {
+                SuggestedFileName = $"{Shell.Dir}-1.0.0.mrpack",
+                SuggestedStartLocation = PickerLocationId.Desktop,
+            };
+            picker.FileTypeChoices.Add("Modrinth 整合包", new[] { ".mrpack" });
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, App.MainWindow!.Hwnd);
+            var file = await picker.PickSaveFileAsync();
+            if (file == null) return;
+
+            ExportPackButton.IsEnabled = false;
+            ExportScriptButton.IsEnabled = false;
+            ExportRing.Visibility = Visibility.Visible;
+            ExportRing.IsActive = true;
+            StatusText.Text = "正在导出整合包...";
+
+            var progress = new Progress<McProgress>(p =>
+            {
+                bool finished = p.Phase.StartsWith("导出完成", StringComparison.Ordinal);
+                if (finished) note = p.Phase;
+                StatusText.Text = finished
+                    ? p.Phase
+                    : $"正在导出整合包（{p.DoneFiles}/{p.TotalFiles}）";
+            });
+            string path = await ModpackExport.ExportAsync(Shell.Dir, file.Path, progress, CancellationToken.None);
+            StatusText.Text = note.Contains("已跳过")
+                ? $"已导出到 {path}。{note}"
+                : $"已导出到 {path}。";
+        }
+        catch (Exception ex)
+        {
+            StatusText.Text = $"导出失败: {ex.Message}";
+        }
+        finally
+        {
+            ExportRing.IsActive = false;
+            ExportRing.Visibility = Visibility.Collapsed;
+            ExportPackButton.IsEnabled = true;
+            ExportScriptButton.IsEnabled = true;
+        }
+    }
+
     private async void ExportScript_Click(object sender, RoutedEventArgs e)
     {
         try

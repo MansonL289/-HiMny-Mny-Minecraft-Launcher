@@ -4,7 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <Grid>
+    <Grid x:Name="RootGrid" AllowDrop="True" DragOver="RootGrid_DragOver" Drop="RootGrid_Drop">
         <Grid.RowDefinitions>
             <RowDefinition Height="48" />
             <RowDefinition Height="*" />
@@ -70,7 +70,7 @@
                         <SymbolIcon Symbol="Contact" />
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="MOD库" Tag="Mod.Library">
+                <NavigationViewItem Content="库" Tag="Mod.Library">
                     <NavigationViewItem.Icon>
                         <SymbolIcon Symbol="Library" />
                     </NavigationViewItem.Icon>
@@ -91,5 +91,41 @@
                 </Frame.ContentTransitions>
             </Frame>
         </NavigationView>
+
+        <!-- 下载完成提示：顶部横幅，点击跳转到「库」 -->
+        <Border
+            x:Name="DoneBanner"
+            Grid.Row="1"
+            VerticalAlignment="Top"
+            HorizontalAlignment="Center"
+            Margin="0,12,0,0"
+            Padding="16,10"
+            CornerRadius="8"
+            Background="{ThemeResource AccentFillColorDefaultBrush}"
+            Visibility="Collapsed"
+            PointerEntered="DoneBanner_PointerEntered"
+            PointerExited="DoneBanner_PointerExited">
+            <Button
+                x:Name="DoneBannerButton"
+                Background="Transparent"
+                BorderThickness="0"
+                Padding="0"
+                Click="DoneBanner_Click"
+                HorizontalAlignment="Stretch">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <SymbolIcon Symbol="Accept" Foreground="White" />
+                    <TextBlock
+                        x:Name="DoneBannerText"
+                        Foreground="White"
+                        VerticalAlignment="Center"
+                        TextTrimming="CharacterEllipsis" />
+                    <TextBlock
+                        Foreground="White"
+                        Opacity="0.7"
+                        VerticalAlignment="Center"
+                        Text="前往库" />
+                </StackPanel>
+            </Button>
+        </Border>
     </Grid>
 </Window>

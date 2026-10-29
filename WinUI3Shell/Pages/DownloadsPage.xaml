@@ -21,10 +21,14 @@
                 <NavigationViewItem Content="游戏版本" Tag="versions" IsSelected="True" />
                 <NavigationViewItem Content="Forge" Tag="forge" />
                 <NavigationViewItem Content="Fabric" Tag="fabric" />
+                <NavigationViewItem Content="Quilt" Tag="quilt" />
                 <NavigationViewItem Content="NeoForge" Tag="neoforge" />
+                <NavigationViewItem Content="OptiFine" Tag="optifine" />
+                <NavigationViewItem Content="LiteLoader" Tag="liteloader" />
                 <NavigationViewItemSeparator />
                 <NavigationViewItem Content="MOD" Tag="mods" />
                 <NavigationViewItem Content="整合包" Tag="modpacks" />
+                <NavigationViewItem Content="服务端" Tag="server" />
             </NavigationView.MenuItems>
             <NavigationView.FooterMenuItems>
                 <NavigationViewItem Content="下载任务" Tag="tasks">

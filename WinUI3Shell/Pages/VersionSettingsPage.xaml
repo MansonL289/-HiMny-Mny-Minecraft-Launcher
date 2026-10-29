@@ -36,6 +36,7 @@
                 <NavigationViewItem Content="截图" Tag="screenshots" />
                 <NavigationViewItem Content="资源包" Tag="packs" />
                 <NavigationViewItem Content="Mod 管理" Tag="mods" />
+                <NavigationViewItem Content="服务器" Tag="servers" />
             </NavigationView.MenuItems>
             <Frame x:Name="SubFrame">
                 <Frame.ContentTransitions>

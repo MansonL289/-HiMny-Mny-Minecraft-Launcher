@@ -23,6 +23,10 @@ public sealed partial class HomePage : Page
 {
     private CancellationTokenSource? _launchCts;
 
+    // ===== 愚人节彩蛋（仅 4 月 1 日生效）=====
+    private readonly bool _isAprilFools = DateTime.Now.Month == 4 && DateTime.Now.Day == 1;
+    private bool _surrendered;
+
     public HomePage()
     {
         InitializeComponent();
@@ -37,6 +41,22 @@ public sealed partial class HomePage : Page
     {
         RefreshVersionList();
         RefreshAccount();
+
+        if (_isAprilFools) InitAprilFools();
+
+        // 快捷方式带 --launch：自动选中对应版本并直接启动（只执行一次）
+        string startup = App.StartupVersion;
+        if (startup.Length == 0) return;
+        App.ConsumeStartupVersion();
+        if (VersionComboBox.ItemsSource is IEnumerable<ComboBoxItem> items)
+        {
+            var target = items.FirstOrDefault(i => (i.Tag as string) == startup && i.IsEnabled);
+            if (target != null)
+            {
+                VersionComboBox.SelectedItem = target;
+                LaunchButton_Click(null!, null!);
+            }
+        }
     }
 
     /// <summary>供主窗口在从版本设置返回时刷新（改名/删除/置顶可能已变化）。</summary>
@@ -253,10 +273,46 @@ public sealed partial class HomePage : Page
     // 启动流程：检查游戏文件 -> 检查/自动下载 Java -> 启动
     private async void LaunchButton_Click(object sender, RoutedEventArgs e)
     {
+        // 愚人节彩蛋：没点「投降」就启动不了（按钮一直在跑，这里兜底防止碰巧点中）
+        if (_isAprilFools && !_surrendered) return;
+
         if ((VersionComboBox.SelectedItem as ComboBoxItem)?.Tag is not string dir) return;
         var meta = VersionMeta.Load(dir);
         if (meta == null) return;
         string versionId = meta.Id;
+
+        // 启动前检查 Mod 冲突：只提示，不阻止（用户可选择仍然启动）
+        var conflicts = ModConflict.Check(dir);
+        if (conflicts.Count > 0)
+        {
+            var panel = new StackPanel { Spacing = 6, MaxWidth = 520 };
+            panel.Children.Add(new TextBlock
+            {
+                Text = "检测到以下问题，可能导致启动失败：",
+                Opacity = 0.75,
+                FontSize = 12,
+                TextWrapping = TextWrapping.Wrap,
+            });
+            foreach (var item in conflicts.Take(8))
+            {
+                panel.Children.Add(new TextBlock
+                {
+                    Text = "• " + item,
+                    FontSize = 12,
+                    TextWrapping = TextWrapping.Wrap,
+                });
+            }
+            var dialog = new ContentDialog
+            {
+                XamlRoot = XamlRoot,
+                Title = "Mod 可能冲突",
+                Content = panel,
+                PrimaryButtonText = "仍然启动",
+                CloseButtonText = "取消",
+                DefaultButton = ContentDialogButton.Close,
+            };
+            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        }
 
         // 记录上次打开的版本与时间，供下次首页默认选中
         AppSettings.LastVersion = dir;
@@ -360,7 +416,8 @@ public sealed partial class HomePage : Page
             string player = account?.Name ?? (string.IsNullOrWhiteSpace(NameText.Text) ? "Steve" : NameText.Text.Trim());
             LaunchService.WriteGameLanguage(gameDir, ResolveLocale());
             var cmd = LaunchService.BuildCommand(versionJson, java, player, meta.MaxMemString(), gameDir,
-                AppSettings.WindowWidth, AppSettings.WindowHeight, account, authlibAgent);
+                AppSettings.WindowWidth, AppSettings.WindowHeight, account, authlibAgent,
+                SplitArgs(meta.ExtraJvmArgs), SplitArgs(meta.ExtraGameArgs));
             // 自动加入服务器：追加 --server/--port 游戏参数
             if (!string.IsNullOrWhiteSpace(meta.AutoJoinServer))
             {
@@ -491,8 +548,35 @@ public sealed partial class HomePage : Page
 
     private void SetLaunchStatus(string text) => LaunchStatus.Text = text;
 
+    // ========== 愚人节彩蛋：启动按钮直接消失，必须点「投降」才能启动 ==========
+
+    private void InitAprilFools()
+    {
+        LaunchButton.Visibility = Visibility.Collapsed;   // 启动按钮直接消失
+        SurrenderHint.Visibility = Visibility.Visible;     // 中间下方显示提示
+        SurrenderButton.Visibility = Visibility.Visible;   // 右下角投降按钮
+    }
+
+    /// <summary>投降：恢复启动按钮，隐藏提示与投降按钮，之后可以正常启动。</summary>
+    private void SurrenderButton_Click(object sender, RoutedEventArgs e)
+    {
+        _surrendered = true;
+        LaunchButton.Visibility = Visibility.Visible;
+        SurrenderHint.Visibility = Visibility.Collapsed;
+        SurrenderButton.Visibility = Visibility.Collapsed;
+    }
+
     // 解析游戏语言：设置项为空时跟随系统；游戏没有的语言依次退回同名语言 / en_us
     private static string ResolveLocale() => GameLanguages.Resolve(AppSettings.GameLanguage) ?? "en_us";
+
+    // 把设置里的「每行一个」参数拆成列表
+    private static List<string>? SplitArgs(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+        var list = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+        return list.Count > 0 ? list : null;
+    }
 
     // 悬浮在名称上时切换为文本指针，移开恢复箭头
     private void NameText_PointerEntered(object sender, PointerRoutedEventArgs e)

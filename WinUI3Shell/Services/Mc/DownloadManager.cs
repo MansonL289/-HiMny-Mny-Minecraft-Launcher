@@ -7,6 +7,7 @@ public enum McAddon
     Fabric,
     Forge,
     NeoForge,
+    Quilt,
 }
 
 /// <summary>一个后台下载任务（进程式：与页面无关，全局可见）。</summary>
@@ -39,6 +40,7 @@ public sealed class DownloadJob
         McAddon.Fabric => " + Fabric",
         McAddon.Forge => " + Forge",
         McAddon.NeoForge => " + NeoForge",
+        McAddon.Quilt => " + Quilt",
         _ => "",
     };
 }
@@ -208,6 +210,12 @@ public static class DownloadManager
                 job.StatusText = "安装 NeoForge...";
                 JobsChanged?.Invoke(null, EventArgs.Empty);
                 await ForgeInstaller.InstallNeoForgeAsync(job.VersionId, versionJson, mirror, progress, job.Cts.Token, job.InstallName, job.LoaderVersion);
+            }
+            if (job.Addon == McAddon.Quilt)
+            {
+                job.StatusText = "安装 Quilt Loader...";
+                JobsChanged?.Invoke(null, EventArgs.Empty);
+                await LoaderInstaller.InstallQuiltAsync(job.VersionId, job.Cts.Token, job.InstallName, job.LoaderVersion);
             }
 
             job.Done = true;

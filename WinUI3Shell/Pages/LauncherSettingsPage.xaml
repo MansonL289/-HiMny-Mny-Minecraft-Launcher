@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Spacing="24">
         <StackPanel Spacing="8">
             <TextBlock Text="应用主题" Style="{StaticResource BodyStrongTextBlockStyle}" />
@@ -30,5 +31,26 @@
                 HorizontalAlignment="Left"
                 Click="OpenVersionsFolder_Click" />
         </StackPanel>
+
+        <StackPanel Spacing="8">
+            <TextBlock Text="网络" Style="{StaticResource BodyStrongTextBlockStyle}" />
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBox
+                    x:Name="ProxyBox"
+                    Width="360"
+                    PlaceholderText="如 http://127.0.0.1:7890，留空不使用代理" />
+                <Button Click="SaveProxy_Click" Content="保存" />
+            </StackPanel>
+            <TextBlock
+                FontSize="12"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="修改后需重启启动器生效。" />
+            <TextBlock
+                x:Name="ProxyStatus"
+                FontSize="12"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                TextWrapping="Wrap" />
+        </StackPanel>
     </StackPanel>
+    </ScrollViewer>
 </Page>

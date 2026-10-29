@@ -24,6 +24,14 @@
   <ItemGroup>
     <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\Head.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\icon_vanilla.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\icon_forge.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\icon_fabric.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\icon_neoforge.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\icon_quilt.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\icon_optifine.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\icon_liteloader.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\icon_mod.png" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- dotnet publish 不会自动带上 XAML 编译产物（.xbf / .pri），这里手动补齐，否则发布版启动即崩溃 -->

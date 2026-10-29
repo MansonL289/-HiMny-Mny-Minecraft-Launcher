@@ -5,13 +5,14 @@ using System.Text.Json.Nodes;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using WinUI3Shell.Services.Mc;
 
 namespace WinUI3Shell.Pages;
 
 /// <summary>设置 - 关于：版本信息、反馈/更新链接与更新检查。</summary>
 public sealed partial class AboutPage : Page
 {
-    private const string CurrentVersion = "Beta 1.2.20261028";
+    private const string CurrentVersion = "Beta 1.3.20261029";
     private const string TagsApi = "https://api.github.com/repos/MansonL289/HiMny-MnyMinecraftLauncher/tags";
 
     private static readonly HttpClient Http = CreateHttp();
@@ -19,6 +20,16 @@ public sealed partial class AboutPage : Page
     public AboutPage()
     {
         InitializeComponent();
+    }
+
+    private void AboutPage_Loaded(object sender, RoutedEventArgs e)
+    {
+        CpuText.Text = "CPU：" + Hardware.CpuName();
+        GpuText.Text = "显卡：" + Hardware.GpuName();
+        var (total, avail) = Hardware.Memory();
+        MemoryText.Text = total > 0
+            ? $"内存：{total / 1024.0:F0} GB（可用 {avail / 1024.0:F0} GB）"
+            : "内存：未知";
     }
 
     private static HttpClient CreateHttp()

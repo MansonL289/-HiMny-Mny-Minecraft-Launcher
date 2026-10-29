@@ -33,6 +33,7 @@ public sealed partial class DownloadSettingsPage : Page
             }
         }
         _initializing = false;
+        CfKeyBox.Password = AppSettings.CurseForgeKey;
     }
 
     private void MirrorBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -53,5 +54,10 @@ public sealed partial class DownloadSettingsPage : Page
         }
 
         AppSettings.DownloadLimitKb = int.TryParse(item.Tag?.ToString(), out int kb) ? kb : 0;
+    }
+
+    private void CfKeyBox_LostFocus(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        AppSettings.CurseForgeKey = CfKeyBox.Password.Trim();
     }
 }

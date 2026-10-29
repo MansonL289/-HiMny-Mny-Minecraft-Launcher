@@ -8,6 +8,23 @@ using WinUI3Shell.Services.Mc;
 
 namespace WinUI3Shell.Pages;
 
+/// <summary>下载页版本列表的一行。</summary>
+public sealed class VersionRow
+{
+    public string Id { get; set; } = "";
+
+    /// <summary>各分类对应的 3D 图标。</summary>
+    public string IconUrl => Category switch
+    {
+        0 => "ms-appx:///Assets/icon_vanilla.png",    // 正式版：草方块
+        1 => "ms-appx:///Assets/icon_optifine.png",    // 快照版：望远镜（预览）
+        2 => "ms-appx:///Assets/icon_forge.png",       // 远古版：铁砧
+        _ => "ms-appx:///Assets/icon_mod.png",         // 愚人节版：附魔书
+    };
+
+    public int Category { get; set; }
+}
+
 /// <summary>版本列表子页面：分类筛选 + 刷新；点击版本进入详情页选择附加模块并下载。</summary>
 public sealed partial class DownloadVersionsPage : Page
 {
@@ -97,16 +114,16 @@ public sealed partial class DownloadVersionsPage : Page
         int category = int.Parse(item.Tag?.ToString() ?? "0");
         VersionList.ItemsSource = _allVersions
             .Where(v => v.Category == category)
-            .Select(v => v.Id)
+            .Select(v => new VersionRow { Id = v.Id, Category = v.Category })
             .ToList();
     }
 
     // 点击版本：跳转到详情子页面（选择附加模块并开始下载）
     private void VersionList_ItemClick(object sender, ItemClickEventArgs e)
     {
-        if (e.ClickedItem is string versionId)
+        if (e.ClickedItem is VersionRow row)
         {
-            Frame.Navigate(typeof(VersionDetailPage), versionId);
+            Frame.Navigate(typeof(VersionDetailPage), row.Id);
         }
     }
 }

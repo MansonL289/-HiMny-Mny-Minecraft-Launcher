@@ -54,7 +54,8 @@ public static class LaunchService
     /// account 为空或离线账号时行为与旧版本一致；第三方账号需要通过 authlibAgent 注入验证服务器。</summary>
     public static List<string> BuildCommand(JsonObject versionJson, string java, string player,
         string maxMem, string gameDir, int windowWidth = 0, int windowHeight = 0,
-        McAccount? account = null, string? authlibAgent = null)
+        McAccount? account = null, string? authlibAgent = null,
+        IReadOnlyList<string>? extraJvm = null, IReadOnlyList<string>? extraGame = null)
     {
         string id = versionJson["id"]!.GetValue<string>();
         string vdir = McPaths.VersionDir(id);
@@ -114,6 +115,10 @@ public static class LaunchService
         {
             cmd.Add($"-javaagent:{authlibAgent}={account?.ServerUrl ?? ""}");
         }
+        if (extraJvm is { Count: > 0 })
+        {
+            cmd.AddRange(extraJvm);
+        }
         var arguments = versionJson["arguments"]?.AsObject();
         if (arguments != null)
         {
@@ -151,6 +156,11 @@ public static class LaunchService
                 cmd.Add("--height");
                 cmd.Add(windowHeight.ToString());
             }
+        }
+        // 用户追加的游戏参数放最后（如 --fullscreen），不影响原版参数顺序
+        if (extraGame is { Count: > 0 })
+        {
+            cmd.AddRange(extraGame);
         }
         return cmd;
     }

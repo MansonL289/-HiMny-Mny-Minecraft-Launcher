@@ -83,7 +83,7 @@ public sealed partial class VersionDetailPage : Page
         NeoForgeRadio.IsEnabled = results[2] is not { Count: 0 };
         // 当前选中的被禁用时退回「不安装」
         int sel = LoaderRadio.SelectedIndex;
-        if (sel > 0 && results[sel - 1] is { Count: 0 })
+        if (sel > 0 && sel <= 3 && results[sel - 1] is { Count: 0 })
         {
             LoaderRadio.SelectedIndex = 0;
         }
@@ -126,6 +126,14 @@ public sealed partial class VersionDetailPage : Page
         _loadCts = cts;
 
         var items = new List<LoaderVersionOption> { new("自动选择最新版（推荐）", null) };
+        if (loaderIndex == 4)
+        {
+            // Quilt 由安装流程自动取最新 loader，无需列表
+            LoaderVersionCombo.ItemsSource = items;
+            LoaderVersionCombo.SelectedIndex = 0;
+            LoaderVersionStatus.Text = "将使用最新 Quilt Loader";
+            return;
+        }
         LoaderVersionCombo.ItemsSource = items;
         LoaderVersionCombo.SelectedIndex = 0;
         LoaderVersionStatus.Text = "正在获取可用版本…";
@@ -197,6 +205,7 @@ public sealed partial class VersionDetailPage : Page
             1 => McAddon.Fabric,
             2 => McAddon.Forge,
             3 => McAddon.NeoForge,
+            4 => McAddon.Quilt,
             _ => McAddon.None,
         };
         string? loaderVersion = addon == McAddon.None

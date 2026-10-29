@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -77,6 +80,11 @@ public sealed partial class MainWindow : Window
         NavView.SelectedItem = NavView.MenuItems[0];
     }
 
+    // 已通知过的任务（用 VersionId + InstallName 标识），避免重复弹
+    private readonly HashSet<string> _notifiedJobs = new();
+    private DispatcherTimer? _bannerTimer;
+    private bool _bannerHovering;
+
     // 下载任务状态变化（来自后台线程，需切回 UI 线程）
     private void OnJobsChanged(object? sender, EventArgs e)
     {
@@ -86,7 +94,67 @@ public sealed partial class MainWindow : Window
             DlIndicator.Visibility = jobs.Any(j => !j.Done) ? Visibility.Visible : Visibility.Collapsed;
             ToolTipService.SetToolTip(DlIndicator, string.Join('\n',
                 jobs.Select(j => $"{j.VersionId}：{j.StatusText}")));
+
+            // 检测刚完成的任务，弹顶部提示
+            foreach (var job in jobs)
+            {
+                if (!job.Done) continue;
+                string key = $"{job.VersionId}|{job.InstallName}";
+                if (_notifiedJobs.Contains(key)) continue;
+                _notifiedJobs.Add(key);
+                if (job.Cancelled) continue;
+                ShowDoneBanner(job);
+                break; // 一次只弹一个，其余下一轮再弹
+            }
         });
+    }
+
+    private void ShowDoneBanner(DownloadJob job)
+    {
+        string name = job.IsModpack ? $"整合包「{job.InstallName}」"
+            : job.IsMod ? $"Mod「{job.VersionId}」"
+            : $"版本「{job.InstallName}」";
+        DoneBannerText.Text = job.Error != null
+            ? $"{name} 下载失败：{job.Error}"
+            : $"{name} 下载完成";
+        DoneBanner.Visibility = Visibility.Visible;
+        StartBannerTimer();
+    }
+
+    private void StartBannerTimer()
+    {
+        _bannerTimer?.Stop();
+        _bannerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _bannerTimer.Tick += (_, _) =>
+        {
+            if (!_bannerHovering) DoneBanner.Visibility = Visibility.Collapsed;
+        };
+        _bannerTimer.Start();
+    }
+
+    private void DoneBanner_PointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        _bannerHovering = true;
+    }
+
+    private void DoneBanner_PointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        _bannerHovering = false;
+    }
+
+    // 点击横幅：跳转到「库」
+    private void DoneBanner_Click(object sender, RoutedEventArgs e)
+    {
+        DoneBanner.Visibility = Visibility.Collapsed;
+        _bannerTimer?.Stop();
+        foreach (var obj in NavView.FooterMenuItems)
+        {
+            if (obj is NavigationViewItem navItem && navItem.Tag as string == "Mod.Library")
+            {
+                NavView.SelectedItem = navItem;
+                break;
+            }
+        }
     }
 
     // 点击标题栏下载按钮：跳到下载页并直达「下载任务」
@@ -124,6 +192,163 @@ public sealed partial class MainWindow : Window
         {
             accountPage.OpenAdd();
         }
+    }
+
+    /// <summary>拖放：整合包（.mrpack / 带 modrinth.index.json 或 manifest.json 的 zip）直接安装；存档文件夹导入。</summary>
+    private void RootGrid_DragOver(object sender, DragEventArgs e)
+    {
+        if (e.DataView.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.StorageItems))
+        {
+            e.AcceptedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Copy;
+            e.DragUIOverride.Caption = "拖入以安装 / 导入";
+        }
+    }
+
+    private async void RootGrid_Drop(object sender, DragEventArgs e)
+    {
+        if (!e.DataView.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.StorageItems)) return;
+        var items = await e.DataView.GetStorageItemsAsync();
+        foreach (var item in items)
+        {
+            if (Directory.Exists(item.Path))
+            {
+                await HandleDroppedFolderAsync(item.Path);
+            }
+            else if (File.Exists(item.Path))
+            {
+                await HandleDroppedFileAsync(item.Path);
+            }
+        }
+    }
+
+    // 拖入存档文件夹：选一个版本导入（或导入共享存档目录）
+    private async Task HandleDroppedFolderAsync(string folder)
+    {
+        if (!File.Exists(Path.Combine(folder, "level.dat")))
+        {
+            await ShowDropMessageAsync("无法识别", "拖入的文件夹不是存档（缺少 level.dat）。");
+            return;
+        }
+
+        var options = new List<string>();
+        var dirs = new List<string>();
+        options.Add("共享存档目录");
+        dirs.Add(McPaths.GameDir);
+        foreach (var versionDir in Directory.Exists(McPaths.VersionsDir)
+                     ? Directory.GetDirectories(McPaths.VersionsDir) : [])
+        {
+            string name = Path.GetFileName(versionDir);
+            var meta = VersionMeta.Load(name);
+            if (meta != null && meta.IsComplete(name))
+            {
+                options.Add(name);
+                dirs.Add(meta.GameDir(name));
+            }
+        }
+
+        var picker = new ComboBox { ItemsSource = options, SelectedIndex = 0, Header = "导入到", MinWidth = 280 };
+        var dialog = new ContentDialog
+        {
+            XamlRoot = (Content as FrameworkElement)?.XamlRoot,
+            Title = "导入存档",
+            Content = new StackPanel
+            {
+                Spacing = 10,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = Path.GetFileName(folder),
+                        FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    },
+                    picker,
+                },
+            },
+            PrimaryButtonText = "导入",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Primary,
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+        string savesDir = Path.Combine(dirs[picker.SelectedIndex], "saves");
+        Directory.CreateDirectory(savesDir);
+        string target = Path.Combine(savesDir, Path.GetFileName(folder));
+        int suffix = 2;
+        while (Directory.Exists(target))
+        {
+            string attempt = Path.GetFileName(folder) + " (" + suffix + ")";
+            suffix++;
+            target = Path.Combine(savesDir, attempt);
+        }
+        await Task.Run(() => CopyDirectory(folder, target));
+        await ShowDropMessageAsync("已导入", "存档已导入到 " + (picker.SelectedIndex == 0 ? "共享存档目录" : options[picker.SelectedIndex]));
+    }
+
+    // 拖入整合包：预览后交给下载任务安装
+    private async Task HandleDroppedFileAsync(string file)
+    {
+        string ext = Path.GetExtension(file).ToLowerInvariant();
+        if (ext is not (".mrpack" or ".zip"))
+        {
+            await ShowDropMessageAsync("无法识别", "目前支持拖入 .mrpack / 整合包 zip / 存档文件夹。");
+            return;
+        }
+
+        ModpackInfo pack;
+        try
+        {
+            pack = await Task.Run(() => Modpack.Load(file));
+        }
+        catch (Exception ex)
+        {
+            await ShowDropMessageAsync("无法读取整合包", ex.Message);
+            return;
+        }
+
+        var nameBox = new TextBox { Text = Modpack.SuggestInstallName(pack), Header = "安装名称", MinWidth = 280 };
+        var info = new TextBlock
+        {
+            Text = $"{pack.Name} {pack.Version} · Minecraft {pack.McVersion} · {pack.LoaderText}\n共 {pack.Files.Count} 个文件",
+            FontSize = 12,
+            Opacity = 0.75,
+            TextWrapping = TextWrapping.Wrap,
+        };
+        var dialog = new ContentDialog
+        {
+            XamlRoot = (Content as FrameworkElement)?.XamlRoot,
+            Title = "安装整合包",
+            Content = new StackPanel { Spacing = 10, Children = { info, nameBox } },
+            PrimaryButtonText = "安装",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Primary,
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+        string installName = nameBox.Text.Trim();
+        if (installName.Length == 0) return;
+        DownloadManager.StartModpack(pack, installName, AppSettings.DownloadMirror);
+        ShowDownloadTasks();
+    }
+
+    private static void CopyDirectory(string source, string dest)
+    {
+        Directory.CreateDirectory(dest);
+        foreach (var dir in Directory.GetDirectories(source, "*", SearchOption.AllDirectories))
+            Directory.CreateDirectory(dir.Replace(source, dest));
+        foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+            File.Copy(file, file.Replace(source, dest), true);
+    }
+
+    private async Task ShowDropMessageAsync(string title, string message)
+    {
+        var dialog = new ContentDialog
+        {
+            XamlRoot = (Content as FrameworkElement)?.XamlRoot,
+            Title = title,
+            Content = message,
+            CloseButtonText = "好",
+        };
+        await dialog.ShowAsync();
     }
 
     /// <summary>切换整个窗口的主题（ElementTheme.Default 表示跟随系统）。</summary>

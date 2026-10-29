@@ -70,6 +70,24 @@ public sealed partial class DownloadsPage : Page
                     DlFrame.Navigate(typeof(ModpackPage));
                 }
                 break;
+            case "quilt":
+                if (DlFrame.CurrentSourcePageType != typeof(QuiltPage))
+                {
+                    DlFrame.Navigate(typeof(QuiltPage));
+                }
+                break;
+            case "server":
+                if (DlFrame.CurrentSourcePageType != typeof(ServerDownloadPage))
+                {
+                    DlFrame.Navigate(typeof(ServerDownloadPage));
+                }
+                break;
+            case "optifine":
+                DlFrame.Navigate(typeof(OptiFinePage), "optifine");
+                break;
+            case "liteloader":
+                DlFrame.Navigate(typeof(OptiFinePage), "liteloader");
+                break;
             default:
                 // 手动下载子页面，参数为加载器名
                 DlFrame.Navigate(typeof(ManualDownloadPage), tag);

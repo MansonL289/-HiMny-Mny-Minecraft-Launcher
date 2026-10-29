@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
     <Grid RowDefinitions="Auto,*,Auto" RowSpacing="16">
         <!-- 缓存 -->
         <StackPanel Spacing="8">
@@ -72,4 +73,5 @@
                 Foreground="#FF6363" />
         </StackPanel>
     </Grid>
+    </ScrollViewer>
 </Page>

@@ -106,11 +106,23 @@ public static class McHttp
 
     private static HttpClient Create()
     {
-        var c = new HttpClient(new HttpClientHandler
+        var handler = new HttpClientHandler
         {
             AllowAutoRedirect = true,
             AutomaticDecompression = DecompressionMethods.All,
-        });
+        };
+        // 设置里填了代理就全局走代理（Mojang / BMCLAPI / Modrinth / Adoptium 都生效）
+        string proxy = AppSettings.ProxyUrl;
+        if (!string.IsNullOrWhiteSpace(proxy))
+        {
+            try
+            {
+                handler.Proxy = new WebProxy(proxy.Trim());
+                handler.UseProxy = true;
+            }
+            catch { /* 代理地址写错就当没填，不阻断下载 */ }
+        }
+        var c = new HttpClient(handler);
         c.DefaultRequestHeaders.UserAgent.ParseAdd("MnyMC/1.0");
         c.Timeout = TimeSpan.FromMinutes(30);
         return c;

@@ -62,6 +62,7 @@ public sealed partial class VersionSettingsPage : Page
             "screenshots" => typeof(VersionScreenshotsPage),
             "packs" => typeof(VersionPacksPage),
             "mods" => typeof(VersionModsPage),
+            "servers" => typeof(VersionServersPage),
             _ => typeof(VersionGeneralPage),
         };
         if (SubFrame.Content?.GetType() != page)

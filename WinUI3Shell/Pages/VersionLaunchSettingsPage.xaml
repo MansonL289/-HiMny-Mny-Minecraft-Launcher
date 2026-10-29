@@ -78,6 +78,40 @@
                 HorizontalAlignment="Left"
                 PlaceholderText="例：mc.example.com 或 mc.example.com:25565"
                 LostFocus="Setting_Changed" />
+
+            <!-- 启动参数：每行一个，追加到原版参数之后 -->
+            <TextBlock
+                Margin="0,14,0,0"
+                Style="{StaticResource BodyStrongTextBlockStyle}"
+                Text="启动参数" />
+            <TextBox
+                x:Name="JvmArgsBox"
+                Width="480"
+                Height="76"
+                Header="追加 JVM 参数（每行一个）"
+                HorizontalAlignment="Left"
+                AcceptsReturn="True"
+                FontFamily="Consolas"
+                FontSize="12"
+                PlaceholderText="例：-XX:+UseG1GC"
+                TextWrapping="Wrap"
+                LostFocus="Setting_Changed" />
+            <TextBox
+                x:Name="GameArgsBox"
+                Width="480"
+                Height="76"
+                Header="追加游戏参数（每行一个）"
+                HorizontalAlignment="Left"
+                AcceptsReturn="True"
+                FontFamily="Consolas"
+                FontSize="12"
+                PlaceholderText="例：--fullscreen"
+                TextWrapping="Wrap"
+                LostFocus="Setting_Changed" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Click="EditRawJson_Click" Content="编辑版本 JSON…" />
+                <Button Click="CreateShortcut_Click" Content="创建桌面快捷方式" />
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </Page>

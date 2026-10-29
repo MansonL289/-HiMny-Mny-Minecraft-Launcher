@@ -25,6 +25,7 @@ public sealed partial class ModpackPage : Page
             SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Downloads,
         };
         picker.FileTypeFilter.Add(".mrpack");
+        picker.FileTypeFilter.Add(".zip");
         WinRT.Interop.InitializeWithWindow.Initialize(picker, App.MainWindow!.Hwnd);
         var file = await picker.PickSingleFileAsync();
         if (file == null) return;

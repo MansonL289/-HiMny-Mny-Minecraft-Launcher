@@ -15,6 +15,10 @@
                 <SymbolIcon Symbol="Refresh" />
             </Button>
             <Button Click="OpenLogDir_Click" Content="打开日志文件夹" />
+            <Button
+                x:Name="ExportButton"
+                Click="ExportDiagnostics_Click"
+                Content="导出诊断报告" />
         </StackPanel>
 
         <Grid Grid.Row="1" Margin="0,12,0,0">
