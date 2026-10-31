@@ -18,6 +18,10 @@ public static class McPaths
     public static string RuntimesDir => Path.Combine(GameDir, "runtimes");
     /// <summary>MOD 库：下载的 Mod 文件仓库（与具体版本无关）。</summary>
     public static string ModLibraryDir => Path.Combine(GameDir, "modlibrary");
+    /// <summary>库里的安装器目录：下载的 Forge/Fabric/NeoForge/Quilt 安装器 jar。</summary>
+    public static string InstallersDir => Path.Combine(GameDir, "modlibrary", "installers");
+    /// <summary>下载的服务端 jar 存放目录。</summary>
+    public static string ServerDir => Path.Combine(GameDir, "server");
     /// <summary>存档备份目录。</summary>
     public static string BackupsDir => Path.Combine(GameDir, "backups", "saves");
 }

@@ -9,6 +9,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Animation;
 using WinUI3Shell.Pages;
+using WinUI3Shell.Services;
 using WinUI3Shell.Services.Mc;
 using Windows.Graphics;
 using Windows.UI;
@@ -75,15 +76,20 @@ public sealed partial class MainWindow : Window
             if (page is HomePage home)
             {
                 home.RefreshVersions();
+                home.RefreshAccount();
             }
         }
         NavView.SelectedItem = NavView.MenuItems[0];
     }
 
-    // 已通知过的任务（用 VersionId + InstallName 标识），避免重复弹
-    private readonly HashSet<string> _notifiedJobs = new();
+    // 已通知过的任务（按任务对象本身标识），避免重复弹
+    private readonly HashSet<DownloadJob> _notifiedJobs = new();
     private DispatcherTimer? _bannerTimer;
     private bool _bannerHovering;
+    private Storyboard? _bannerStoryboard;
+    private int _bannerAnimToken;
+    private bool _dlIndicatorShown;
+    private int _dlAnimToken;
 
     // 下载任务状态变化（来自后台线程，需切回 UI 线程）
     private void OnJobsChanged(object? sender, EventArgs e)
@@ -91,7 +97,7 @@ public sealed partial class MainWindow : Window
         DispatcherQueue.TryEnqueue(() =>
         {
             var jobs = DownloadManager.Jobs;
-            DlIndicator.Visibility = jobs.Any(j => !j.Done) ? Visibility.Visible : Visibility.Collapsed;
+            UpdateDlIndicator(jobs.Any(j => !j.Done));
             ToolTipService.SetToolTip(DlIndicator, string.Join('\n',
                 jobs.Select(j => $"{j.VersionId}：{j.StatusText}")));
 
@@ -99,9 +105,7 @@ public sealed partial class MainWindow : Window
             foreach (var job in jobs)
             {
                 if (!job.Done) continue;
-                string key = $"{job.VersionId}|{job.InstallName}";
-                if (_notifiedJobs.Contains(key)) continue;
-                _notifiedJobs.Add(key);
+                if (!_notifiedJobs.Add(job)) continue;
                 if (job.Cancelled) continue;
                 ShowDoneBanner(job);
                 break; // 一次只弹一个，其余下一轮再弹
@@ -109,17 +113,40 @@ public sealed partial class MainWindow : Window
         });
     }
 
+    /// <summary>当前横幅对应的任务（「安装」作用对象）。</summary>
+    private DownloadJob? _bannerJob;
+
     private void ShowDoneBanner(DownloadJob job)
     {
-        string name = job.IsModpack ? $"整合包「{job.InstallName}」"
-            : job.IsMod ? $"Mod「{job.VersionId}」"
-            : $"版本「{job.InstallName}」";
-        DoneBannerText.Text = job.Error != null
-            ? $"{name} 下载失败：{job.Error}"
-            : $"{name} 下载完成";
+        _bannerJob = job;
+        DoneBannerText.Text = DownloadManager.BannerText(job);
+        // MOD / 安装器下载完成后可以直接安装；安装任务本身、失败或取消的不给安装入口
+        DoneBannerInstallButton.Visibility = job.Error == null && !job.Cancelled && !job.IsInstallAction
+            && (job.IsMod || job.IsInstaller)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         DoneBanner.Visibility = Visibility.Visible;
         StartBannerTimer();
+
+        // 启动器不在前台（最小化/被别的窗口盖住）：额外弹一条系统通知
+        if (!IsForegroundWindow()) Notifications.ShowDownloadDone(job);
     }
+
+    /// <summary>当前前台窗口是否就是启动器自己。</summary>
+    private bool IsForegroundWindow()
+    {
+        try
+        {
+            return GetForegroundWindow() == WinRT.Interop.WindowNative.GetWindowHandle(this);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
 
     private void StartBannerTimer()
     {
@@ -142,11 +169,32 @@ public sealed partial class MainWindow : Window
         _bannerHovering = false;
     }
 
-    // 点击横幅：跳转到「库」
-    private void DoneBanner_Click(object sender, RoutedEventArgs e)
+    // 点击「查看」：跳转到「库」
+    private void DoneBannerView_Click(object sender, RoutedEventArgs e)
+    {
+        var job = _bannerJob;
+        HideDoneBanner();
+        ShowLibraryFor(job);
+    }
+
+    // 点击「安装」：MOD 装到选中版本，安装器给适配版本装加载器
+    private async void DoneBannerInstall_Click(object sender, RoutedEventArgs e)
+    {
+        var job = _bannerJob;
+        HideDoneBanner();
+        if (job == null || (Content as FrameworkElement)?.XamlRoot is not { } root) return;
+        await ModFlow.InstallFromJobAsync(root, job);
+    }
+
+    private void HideDoneBanner()
     {
         DoneBanner.Visibility = Visibility.Collapsed;
         _bannerTimer?.Stop();
+    }
+
+    /// <summary>跳到「库」页并切到对应栏目（下载完成的内容在哪个栏目就显示哪个；系统通知点「查看」也走这里）。</summary>
+    public void ShowLibraryFor(DownloadJob? job = null)
+    {
         foreach (var obj in NavView.FooterMenuItems)
         {
             if (obj is NavigationViewItem navItem && navItem.Tag as string == "Mod.Library")
@@ -154,6 +202,10 @@ public sealed partial class MainWindow : Window
                 NavView.SelectedItem = navItem;
                 break;
             }
+        }
+        if (_pageCache.TryGetValue("Mod.Library", out var page) && page is ModLibraryPage library)
+        {
+            library.ShowFor(job);
         }
     }
 

@@ -12,10 +12,11 @@ using WinUI3Shell.Services.Mc;
 
 namespace WinUI3Shell.Pages;
 
-/// <summary>手动下载子页面：列出 Forge/Fabric/NeoForge 安装器版本，用另存为方式下载。</summary>
+/// <summary>安装器下载子页面：列出 Forge/Fabric/NeoForge 安装器版本，选中后加入下载列表。</summary>
 public sealed partial class ManualDownloadPage : Page
 {
-    private sealed record BuildItem(string Display, string Url, string FileName);
+    private sealed record BuildItem(string Display, string JobName, string Url, string FileName,
+        string? LoaderVersion);
 
     private string _loader = "forge";
     private readonly List<BuildItem> _builds = new();
@@ -89,7 +90,7 @@ public sealed partial class ManualDownloadPage : Page
     private async Task LoadListAsync()
     {
         LoadingRing.Visibility = Visibility.Visible;
-        SaveSelectedButton.IsEnabled = false;
+        QueueSelectedButton.IsEnabled = false;
         _builds.Clear();
         BuildList.ItemsSource = null;
         StatusText.Text = "";
@@ -112,8 +113,8 @@ public sealed partial class ManualDownloadPage : Page
                     {
                         string v = node!["version"]!.GetValue<string>();
                         string file = $"forge-{mc}-{v}-installer.jar";
-                        _builds.Add(new BuildItem($"Forge {v}（MC {mc}）",
-                            $"https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge/{mc}-{v}/{file}", file));
+                        _builds.Add(new BuildItem($"Forge {v}（MC {mc}）", $"Forge {v} · MC {mc}",
+                            $"https://bmclapi2.bangbang93.com/maven/net/minecraftforge/forge/{mc}-{v}/{file}", file, v));
                     }
                     break;
                 }
@@ -125,8 +126,8 @@ public sealed partial class ManualDownloadPage : Page
                     {
                         string v = node!["version"]!.GetValue<string>();
                         string file = $"fabric-installer-{v}.jar";
-                        _builds.Add(new BuildItem($"Fabric Installer {v}",
-                            $"https://maven.fabricmc.net/net/fabricmc/fabric-installer/{v}/{file}", file));
+                        _builds.Add(new BuildItem($"Fabric Installer {v}", $"Fabric Installer {v}",
+                            $"https://maven.fabricmc.net/net/fabricmc/fabric-installer/{v}/{file}", file, null));
                     }
                     break;
                 }
@@ -140,15 +141,15 @@ public sealed partial class ManualDownloadPage : Page
                     foreach (string v in vers)
                     {
                         string file = $"neoforge-{v}-installer.jar";
-                        _builds.Add(new BuildItem($"NeoForge {v}",
-                            $"https://bmclapi2.bangbang93.com/maven/net/neoforged/neoforge/{v}/{file}", file));
+                        _builds.Add(new BuildItem($"NeoForge {v}", $"NeoForge {v}",
+                            $"https://bmclapi2.bangbang93.com/maven/net/neoforged/neoforge/{v}/{file}", file, null));
                     }
                     break;
                 }
             }
             BuildList.ItemsSource = _builds.Select(b => b.Display).ToList();
             StatusText.Text = _builds.Count > 0
-                ? $"共 {_builds.Count} 个，选中后点击“另存为下载所选”。"
+                ? $"共 {_builds.Count} 个，选中后点击“加入下载列表”。"
                 : "没有找到可用版本。";
         }
         catch (Exception ex)
@@ -163,43 +164,17 @@ public sealed partial class ManualDownloadPage : Page
 
     private void BuildList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        SaveSelectedButton.IsEnabled = BuildList.SelectedIndex >= 0;
+        QueueSelectedButton.IsEnabled = BuildList.SelectedIndex >= 0;
     }
 
-    private async void SaveSelected_Click(object sender, RoutedEventArgs e)
+    /// <summary>把选中的安装器加入下载列表：下载进库，完成后由顶部提示提供「安装」。</summary>
+    private void QueueSelected_Click(object sender, RoutedEventArgs e)
     {
-        if (BuildList.SelectedIndex < 0)
-        {
-            return;
-        }
+        if (BuildList.SelectedIndex < 0) return;
         var item = _builds[BuildList.SelectedIndex];
-        await SaveAsAsync(item.Url, item.FileName);
-    }
-
-    // 另存为下载。注：系统 FileSavePicker 不支持自定义默认目录，
-    // 只能给出建议文件名；我的世界文件夹为 %USERPROFILE%\.mnymc。
-    private async Task SaveAsAsync(string url, string fileName)
-    {
-        var picker = new Windows.Storage.Pickers.FileSavePicker();
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, App.MainWindow!.Hwnd);
-        picker.SuggestedFileName = fileName;
-        picker.FileTypeChoices.Add("JAR 文件", new List<string> { ".jar" });
-        var file = await picker.PickSaveFileAsync();
-        if (file == null)
-        {
-            return;
-        }
-
-        StatusText.Text = "正在下载…";
-        try
-        {
-            await Downloader.DownloadManyAsync(
-                new List<McDownloadTask> { new(url, file.Path) }, 1, fileName, null, default);
-            StatusText.Text = $"已保存到 {file.Path}";
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = $"下载失败: {ex.Message}";
-        }
+        // Forge 绑定所选游戏版本；Fabric/NeoForge 的安装器与版本无关，任意版本都可装
+        string mc = _loader == "forge" ? McVersionCombo.SelectedItem as string ?? "" : "";
+        DownloadManager.StartInstaller(_loader, mc, item.JobName, item.Url, item.FileName, item.LoaderVersion);
+        StatusText.Text = $"「{item.JobName}」已加入下载列表，完成后在库或顶部提示里安装。";
     }
 }

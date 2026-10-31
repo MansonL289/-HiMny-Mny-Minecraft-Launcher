@@ -42,11 +42,11 @@
             Orientation="Horizontal"
             Spacing="12">
             <Button
-                x:Name="SaveSelectedButton"
-                Content="另存为下载所选"
+                x:Name="QueueSelectedButton"
+                Content="加入下载列表"
                 IsEnabled="False"
                 Style="{StaticResource AccentButtonStyle}"
-                Click="SaveSelected_Click" />
+                Click="QueueSelected_Click" />
             <TextBlock
                 x:Name="StatusText"
                 VerticalAlignment="Center"

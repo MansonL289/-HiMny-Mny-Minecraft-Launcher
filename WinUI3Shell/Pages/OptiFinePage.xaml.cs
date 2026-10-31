@@ -16,7 +16,6 @@ public sealed partial class OptiFinePage : Page
 {
     private List<OfChoice> _ofVersions = [];
     private List<WinUI3Shell.Services.Mc.LiteLoader.LlVersion> _llVersions = [];
-    private bool _busy;
     private string _mode = "optifine";
 
     public OptiFinePage()
@@ -91,7 +90,7 @@ public sealed partial class OptiFinePage : Page
 
     private async Task LoadOfAsync()
     {
-        if (!TryGetBase(out string baseDir, out string mcVersion)) return;
+        if (!TryGetBase(out _, out string mcVersion)) return;
 
         if (_mode == "optifine")
         {
@@ -105,7 +104,6 @@ public sealed partial class OptiFinePage : Page
                 OfCombo.ItemsSource = _ofVersions.Select(v => new ComboBoxItem { Content = v.Text, Tag = v }).ToList();
                 OfCombo.PlaceholderText = _ofVersions.Count > 0 ? "选择 OptiFine 版本" : "该版本没有 OptiFine";
                 if (_ofVersions.Count > 0) OfCombo.SelectedIndex = 0;
-                NameBox.Text = $"{baseDir}-OptiFine";
             }
             catch (Exception ex)
             {
@@ -121,7 +119,7 @@ public sealed partial class OptiFinePage : Page
                 .Select(v => new ComboBoxItem { Content = v.Version, Tag = v }).ToList();
             LlCombo.PlaceholderText = candidates.Count > 0 ? "选择 LiteLoader 版本" : "该版本没有 LiteLoader";
             if (candidates.Count > 0) LlCombo.SelectedIndex = 0;
-            InstallLlButton.IsEnabled = candidates.Count > 0;
+            QueueLlButton.IsEnabled = candidates.Count > 0;
         }
     }
 
@@ -143,106 +141,30 @@ public sealed partial class OptiFinePage : Page
         await LoadOfAsync();
     }
 
-    private async void InstallOf_Click(object sender, RoutedEventArgs e)
+    /// <summary>把选中的 OptiFine 安装器加入下载列表：下载进库，完成后由顶部提示提供「安装」。</summary>
+    private void QueueOf_Click(object sender, RoutedEventArgs e)
     {
-        if (_busy) return;
-        if (!TryGetBase(out string baseDir, out string mcVersion))
+        if (!TryGetBase(out _, out string mcVersion))
         {
-            await ShowAsync("请选择基础版本", "需要选一个已下载完整的原版版本。");
+            StatusText.Text = "请先选择一个基础版本（用于确定 OptiFine 对应的游戏版本）。";
             return;
         }
-        if ((OfCombo.SelectedItem as ComboBoxItem)?.Tag is not OfChoice choice)
-        {
-            await ShowAsync("请选择 OptiFine 版本", "版本列表为空，可能是网络问题。");
-            return;
-        }
-        string installName = NameBox.Text.Trim();
-        if (installName.Length == 0) installName = $"{baseDir}-OptiFine";
-        if (Directory.Exists(VersionMeta.DirPath(installName)))
-        {
-            await ShowAsync("名称已存在", $"版本「{installName}」已经存在，请换一个安装名称。");
-            return;
-        }
+        if ((OfCombo.SelectedItem as ComboBoxItem)?.Tag is not OfChoice choice) return;
 
-        _busy = true;
-        SetBusy(OfRing, InstallOfButton, true);
-        try
-        {
-            var progress = new Progress<McProgress>(p =>
-                StatusText.Text = p.TotalFiles > 0 ? $"{p.Phase} ({p.DoneFiles}/{p.TotalFiles})" : p.Phase);
-            await OptiFine.InstallAsync(baseDir, mcVersion, choice.Version, installName, progress, CancellationToken.None);
-            StatusText.Text = $"已安装到版本「{installName}」，回首页即可选择启动。";
-            GameLanguages.Invalidate();
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = "安装失败：" + ex.Message;
-        }
-        finally
-        {
-            _busy = false;
-            SetBusy(OfRing, InstallOfButton, false);
-            await LoadOfAsync();
-        }
+        var of = choice.Version;
+        string url = $"https://bmclapi2.bangbang93.com/optifine/{mcVersion}/{of.Type}/{of.Patch}";
+        DownloadManager.StartInstaller("optifine", mcVersion,
+            $"OptiFine {mcVersion} {of.Type} {of.Patch}", url, of.FileName);
+        StatusText.Text = $"「OptiFine {of.Type} {of.Patch}」已加入下载列表，完成后在库或顶部提示里安装。";
     }
 
-    private async void InstallLl_Click(object sender, RoutedEventArgs e)
+    /// <summary>把选中的 LiteLoader 安装器加入下载列表：下载进库，完成后由顶部提示提供「安装」。</summary>
+    private void QueueLl_Click(object sender, RoutedEventArgs e)
     {
-        if (_busy) return;
-        if (!TryGetBase(out string baseDir, out _))
-        {
-            await ShowAsync("请选择基础版本", "需要选一个已下载完整的原版版本。");
-            return;
-        }
-        if ((LlCombo.SelectedItem as ComboBoxItem)?.Tag is not WinUI3Shell.Services.Mc.LiteLoader.LlVersion ll)
-        {
-            await ShowAsync("请选择 LiteLoader 版本", "版本列表为空，可能是网络问题。");
-            return;
-        }
-        string installName = $"{baseDir}-LiteLoader";
-        if (Directory.Exists(VersionMeta.DirPath(installName)))
-        {
-            await ShowAsync("名称已存在", $"版本「{installName}」已经存在，请先删除旧版本。");
-            return;
-        }
+        if ((LlCombo.SelectedItem as ComboBoxItem)?.Tag is not WinUI3Shell.Services.Mc.LiteLoader.LlVersion ll) return;
 
-        _busy = true;
-        SetBusy(LlRing, InstallLlButton, true);
-        try
-        {
-            var progress = new Progress<McProgress>(p =>
-                StatusText.Text = p.TotalFiles > 0 ? $"{p.Phase} ({p.DoneFiles}/{p.TotalFiles})" : p.Phase);
-            await WinUI3Shell.Services.Mc.LiteLoader.InstallAsync(baseDir, ll, installName, progress, CancellationToken.None);
-            StatusText.Text = $"已安装到版本「{installName}」，回首页即可选择启动。";
-            GameLanguages.Invalidate();
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = "安装失败：" + ex.Message;
-        }
-        finally
-        {
-            _busy = false;
-            SetBusy(LlRing, InstallLlButton, false);
-        }
-    }
-
-    private static void SetBusy(ProgressRing ring, Button button, bool busy)
-    {
-        ring.IsActive = busy;
-        ring.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
-        button.IsEnabled = !busy;
-    }
-
-    private async Task ShowAsync(string title, string message)
-    {
-        var dialog = new ContentDialog
-        {
-            XamlRoot = XamlRoot,
-            Title = title,
-            Content = message,
-            CloseButtonText = "好",
-        };
-        await dialog.ShowAsync();
+        DownloadManager.StartInstaller("liteloader", ll.McVersion,
+            $"LiteLoader {ll.McVersion} {ll.Version}", ll.Url, ModFlow.LiteLoaderFileName(ll));
+        StatusText.Text = $"「LiteLoader {ll.Version}」已加入下载列表，完成后在库或顶部提示里安装。";
     }
 }

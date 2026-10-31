@@ -15,7 +15,7 @@
             Margin="0,8,0,12"
             FontSize="12"
             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-            Text="Quilt 官方安装器：选中版本后另存为 jar，双击或用 java -jar 运行即可安装到指定游戏版本。"
+            Text="Quilt 官方安装器：选中后加入下载列表，下载完成会放进库，可直接安装到已下载的版本。"
             TextWrapping="Wrap" />
 
         <Grid Grid.Row="2">
@@ -37,11 +37,11 @@
             Orientation="Horizontal"
             Spacing="12">
             <Button
-                x:Name="SaveSelectedButton"
-                Content="另存为下载所选"
+                x:Name="QueueSelectedButton"
+                Content="加入下载列表"
                 IsEnabled="False"
                 Style="{StaticResource AccentButtonStyle}"
-                Click="SaveSelected_Click" />
+                Click="QueueSelected_Click" />
             <TextBlock
                 x:Name="StatusText"
                 VerticalAlignment="Center"

@@ -31,18 +31,28 @@ public static class OptiFine
     }
 
     /// <summary>把 OptiFine 装到新版本目录 installName（基于 baseDir 的原版 jar 打补丁）。</summary>
+    /// <param name="installerPath">已下载的安装器 jar 路径；为空则从 BMCLAPI 下载。</param>
     public static async Task InstallAsync(string baseDir, string mcVersion, OfVersion of,
-        string installName, IProgress<McProgress>? progress, CancellationToken ct)
+        string installName, IProgress<McProgress>? progress, CancellationToken ct,
+        string? installerPath = null)
     {
         string temp = Path.Combine(Path.GetTempPath(), "mnymc-of-" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(temp);
         try
         {
             string installer = Path.Combine(temp, of.FileName);
-            progress?.Report(new McProgress("下载 OptiFine", 0, 0, 0, 1));
-            await Downloader.DownloadManyAsync(
-                [new McDownloadTask($"https://bmclapi2.bangbang93.com/optifine/{mcVersion}/{of.Type}/{of.Patch}", installer)],
-                1, "下载 OptiFine", progress, ct);
+            if (installerPath != null && File.Exists(installerPath))
+            {
+                // 库里已有安装器：直接复用，不再重复下载
+                installer = installerPath;
+            }
+            else
+            {
+                progress?.Report(new McProgress("下载 OptiFine", 0, 0, 0, 1));
+                await Downloader.DownloadManyAsync(
+                    [new McDownloadTask($"https://bmclapi2.bangbang93.com/optifine/{mcVersion}/{of.Type}/{of.Patch}", installer)],
+                    1, "下载 OptiFine", progress, ct);
+            }
 
             string baseJar = VersionMeta.Load(baseDir)?.JarPath(baseDir) ?? "";
             if (!File.Exists(baseJar))

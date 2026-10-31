@@ -123,16 +123,26 @@
                     SelectionChanged="VersionComboBox_SelectionChanged" />
             </StackPanel>
 
-            <Button
-                x:Name="LaunchButton"
-                Content="启动"
+            <StackPanel
+                Grid.Row="2"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Bottom"
-                MinWidth="140"
-                MinHeight="40"
-                IsEnabled="False"
-                Style="{StaticResource AccentButtonStyle}"
-                Click="LaunchButton_Click" />
+                Spacing="6">
+                <TextBlock
+                    x:Name="NoAccountHint"
+                    Text="无用户，无法启动"
+                    HorizontalAlignment="Right"
+                    Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                    Visibility="Collapsed" />
+                <Button
+                    x:Name="LaunchButton"
+                    Content="启动"
+                    MinWidth="140"
+                    MinHeight="40"
+                    IsEnabled="False"
+                    Style="{StaticResource AccentButtonStyle}"
+                    Click="LaunchButton_Click" />
+            </StackPanel>
         </Grid>
     </Grid>
 </Page>

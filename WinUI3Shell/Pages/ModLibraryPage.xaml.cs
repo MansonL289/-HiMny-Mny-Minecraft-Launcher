@@ -43,11 +43,42 @@ public sealed class ModLibraryItem
     public string DetailText { get; set; } = "";
 }
 
+/// <summary>库里已下载的安装器（Forge/Fabric/NeoForge/Quilt 安装器 jar）。</summary>
+public sealed class InstallerItem
+{
+    public string Name { get; set; } = "";
+    /// <summary>加载器种类：forge / fabric / neoforge / quilt。</summary>
+    public string Loader { get; set; } = "";
+    public string Path { get; set; } = "";
+    public string DetailText { get; set; } = "";
+
+    public string IconUrl => Loader switch
+    {
+        "forge" => "ms-appx:///Assets/icon_forge.png",
+        "fabric" => "ms-appx:///Assets/icon_fabric.png",
+        "neoforge" => "ms-appx:///Assets/icon_neoforge.png",
+        "quilt" => "ms-appx:///Assets/icon_quilt.png",
+        "optifine" => "ms-appx:///Assets/icon_optifine.png",
+        "liteloader" => "ms-appx:///Assets/icon_liteloader.png",
+        _ => "ms-appx:///Assets/icon_vanilla.png",
+    };
+}
+
+/// <summary>库里已下载的服务端 jar。</summary>
+public sealed class ServerFileItem
+{
+    public string Name { get; set; } = "";
+    public string Path { get; set; } = "";
+    public string DetailText { get; set; } = "";
+}
+
 /// <summary>库：已安装的版本、下载的 Mod、以及各加载器安装情况。</summary>
 public sealed partial class ModLibraryPage : Page
 {
     private readonly ObservableCollection<ModLibraryItem> _items = new();
     private readonly ObservableCollection<VersionItem> _versions = new();
+    private readonly ObservableCollection<InstallerItem> _installers = new();
+    private readonly ObservableCollection<ServerFileItem> _servers = new();
     private bool _busy;
     private int _refreshSeq;
 
@@ -62,6 +93,7 @@ public sealed partial class ModLibraryPage : Page
         RefreshVersions();
         RefreshMods();
         RefreshLoaders();
+        RefreshServers();
     }
 
     // ===== 版本 =====
@@ -216,7 +248,7 @@ public sealed partial class ModLibraryPage : Page
             _outcomes = outcomes;
             int ok = outcomes.Count(o => o.Ok);
             DownloadManager.Report(job, $"已安装到 {ok} 个版本", 1);
-        });
+        }, entry.Id, isInstall: true);
         DownloadManager.JobsChanged += OnJobChanged;
         OnJobChanged(null, EventArgs.Empty);
     }
@@ -290,6 +322,100 @@ public sealed partial class ModLibraryPage : Page
         bool empty = list.Count == 0;
         LoaderEmpty.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
         LoaderList.Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
+        RefreshInstallers(tag);
+    }
+
+    /// <summary>刷新已下载的安装器列表（父栏目显示全部，子栏目只显示对应加载器）。</summary>
+    private void RefreshInstallers(string? tag)
+    {
+        _installers.Clear();
+        string? filter = tag is "forge" or "fabric" or "neoforge" or "quilt"
+            or "optifine" or "liteloader" ? tag : null;
+        if (Directory.Exists(McPaths.InstallersDir))
+        {
+            foreach (string loaderDir in Directory.GetDirectories(McPaths.InstallersDir)
+                .OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+            {
+                string loader = Path.GetFileName(loaderDir).ToLowerInvariant();
+                if (filter != null && loader != filter) continue;
+                foreach (string jar in Directory.GetFiles(loaderDir, "*.jar").OrderByDescending(f => f))
+                {
+                    _installers.Add(new InstallerItem
+                    {
+                        Name = Path.GetFileName(jar),
+                        Loader = loader,
+                        Path = jar,
+                        DetailText = $"{ModFlow.LoaderName(loader)} 安装器 · 已放入库",
+                    });
+                }
+            }
+        }
+        InstallerList.ItemsSource = _installers;
+        bool any = _installers.Count > 0;
+        InstallerHeader.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
+        InstallerList.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>安装已下载的安装器：选适配版本，用该加载器新建版本。</summary>
+    private async void InstallInstaller_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: InstallerItem item }) return;
+        string mc = ModFlow.InstallerMcFromFileName(item.Loader, item.Name);
+        string? version = ModFlow.InstallerVersionFromFileName(item.Loader, item.Name);
+        await ModFlow.InstallInstallerAsync(XamlRoot, item.Loader, mc, version, item.Path);
+    }
+
+    private void DeleteInstaller_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: InstallerItem item }) return;
+        try
+        {
+            File.Delete(item.Path);
+        }
+        catch { /* 占用时留待下次覆盖 */ }
+        RefreshInstallers(SideBar.SelectedItem is NavigationViewItem nav ? nav.Tag?.ToString() : null);
+    }
+
+    // ===== 服务端 =====
+
+    /// <summary>刷新库里的服务端 jar 列表。</summary>
+    private void RefreshServers()
+    {
+        _servers.Clear();
+        if (Directory.Exists(McPaths.ServerDir))
+        {
+            foreach (string jar in Directory.GetFiles(McPaths.ServerDir, "*.jar").OrderByDescending(f => f))
+            {
+                long size = new FileInfo(jar).Length;
+                _servers.Add(new ServerFileItem
+                {
+                    Name = Path.GetFileName(jar),
+                    Path = jar,
+                    DetailText = $"服务端 jar · {size / 1024.0 / 1024.0:F1} MB",
+                });
+            }
+        }
+        ServerList.ItemsSource = _servers;
+        bool empty = _servers.Count == 0;
+        ServerEmpty.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
+        ServerList.Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    private void OpenServerFolder_Click(object sender, RoutedEventArgs e)
+    {
+        string dir = McPaths.ServerDir;
+        if (Directory.Exists(dir)) Process.Start("explorer.exe", dir);
+    }
+
+    private void DeleteServer_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: ServerFileItem item }) return;
+        try
+        {
+            File.Delete(item.Path);
+        }
+        catch { /* 占用时留待下次覆盖 */ }
+        RefreshServers();
     }
 
     private void SideBar_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
@@ -304,12 +430,22 @@ public sealed partial class ModLibraryPage : Page
                 VersionsPanel.Visibility = Visibility.Visible;
                 ModsPanel.Visibility = Visibility.Collapsed;
                 LoaderPanel.Visibility = Visibility.Collapsed;
+                ServerPanel.Visibility = Visibility.Collapsed;
                 break;
             case "mods":
                 TitleText.Text = "MOD";
                 VersionsPanel.Visibility = Visibility.Collapsed;
                 ModsPanel.Visibility = Visibility.Visible;
                 LoaderPanel.Visibility = Visibility.Collapsed;
+                ServerPanel.Visibility = Visibility.Collapsed;
+                break;
+            case "servers":
+                TitleText.Text = "服务端";
+                VersionsPanel.Visibility = Visibility.Collapsed;
+                ModsPanel.Visibility = Visibility.Collapsed;
+                LoaderPanel.Visibility = Visibility.Collapsed;
+                ServerPanel.Visibility = Visibility.Visible;
+                RefreshServers();
                 break;
             default:
                 // loaders 父栏目或具体加载器子栏目
@@ -317,10 +453,42 @@ public sealed partial class ModLibraryPage : Page
                 VersionsPanel.Visibility = Visibility.Collapsed;
                 ModsPanel.Visibility = Visibility.Collapsed;
                 LoaderPanel.Visibility = Visibility.Visible;
+                ServerPanel.Visibility = Visibility.Collapsed;
                 RefreshLoaders();
                 break;
         }
     }
 
     private void Refresh_Click(object sender, RoutedEventArgs e) => RefreshAll();
+
+    /// <summary>供外部（下载完成横幅「查看」）切到对应栏目并刷新。</summary>
+    public void ShowFor(DownloadJob? job)
+    {
+        string tag = job?.Kind switch
+        {
+            DownloadKind.Mod => "mods",
+            DownloadKind.File => "servers",
+            DownloadKind.Installer => job.InstallerLoader is "forge" or "fabric" or "neoforge"
+                or "quilt" or "optifine" or "liteloader" ? job.InstallerLoader : "loaders",
+            _ => "versions",
+        };
+        var item = FindItem(SideBar.MenuItems, tag);
+        if (item != null)
+        {
+            SideBar.SelectedItem = item;
+        }
+        RefreshAll();
+    }
+
+    private static NavigationViewItem? FindItem(IList<object> items, string tag)
+    {
+        foreach (var obj in items)
+        {
+            if (obj is not NavigationViewItem item) continue;
+            if (item.Tag as string == tag) return item;
+            var child = FindItem(item.MenuItems, tag);
+            if (child != null) return child;
+        }
+        return null;
+    }
 }

@@ -42,17 +42,26 @@ public static class LiteLoader
     }
 
     /// <summary>把 LiteLoader 装到新版本目录 installName（基于 baseDir 的原版版本）。</summary>
+    /// <param name="installerPath">已下载的安装器 jar 路径；为空则从官方地址下载。</param>
     public static async Task InstallAsync(string baseDir, LlVersion ll, string installName,
-        IProgress<McProgress>? progress, CancellationToken ct)
+        IProgress<McProgress>? progress, CancellationToken ct, string? installerPath = null)
     {
         string temp = Path.Combine(Path.GetTempPath(), "mnymc-ll-" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(temp);
         try
         {
             string jar = Path.Combine(temp, "liteloader.jar");
-            progress?.Report(new McProgress("下载 LiteLoader", 0, 0, 0, 1));
-            await Downloader.DownloadManyAsync(
-                [new McDownloadTask(ll.Url, jar)], 1, "下载 LiteLoader", progress, ct);
+            if (installerPath != null && File.Exists(installerPath))
+            {
+                // 库里已有安装器：直接复用，不再重复下载
+                jar = installerPath;
+            }
+            else
+            {
+                progress?.Report(new McProgress("下载 LiteLoader", 0, 0, 0, 1));
+                await Downloader.DownloadManyAsync(
+                    [new McDownloadTask(ll.Url, jar)], 1, "下载 LiteLoader", progress, ct);
+            }
 
             // 1) LiteLoader 本体放到 maven 标准路径
             string libName = $"com.mumfrey:liteloader:{ll.Version}";

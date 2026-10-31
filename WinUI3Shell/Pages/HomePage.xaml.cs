@@ -72,29 +72,43 @@ public sealed partial class HomePage : Page
         };
     }
 
-    /// <summary>按当前账号刷新名称与皮肤头；离线账号/没有账号时显示默认头像。</summary>
-    private void RefreshAccount()
+    /// <summary>是否已有登录账号：没有账号时禁止启动并提示。</summary>
+    private static bool HasAccount => AccountStore.Active != null;
+
+    /// <summary>按当前账号刷新名称与皮肤头；离线账号/没有账号时显示默认头像。供主窗口从账号页返回时调用。</summary>
+    public void RefreshAccount()
     {
         var account = AccountStore.Active;
+        NoAccountHint.Visibility = HasAccount ? Visibility.Collapsed : Visibility.Visible;
         if (account == null || string.IsNullOrWhiteSpace(account.Name))
         {
             NameText.Text = "Steve";
             AvatarImage.Source = null;
             AvatarImage.Visibility = Visibility.Collapsed;
-            return;
         }
-
-        NameText.Text = account.Name;
-        // 离线账号没有皮肤，按名字去 mc-heads 会拉到别人的重名皮肤，始终用本地默认头像
-        if (account.Type == "offline")
+        else
         {
-            AvatarImage.Source = null;
-            AvatarImage.Visibility = Visibility.Collapsed;
-            return;
+            NameText.Text = account.Name;
+            // 离线账号没有皮肤，按名字去 mc-heads 会拉到别人的重名皮肤，始终用本地默认头像
+            if (account.Type == "offline")
+            {
+                AvatarImage.Source = null;
+                AvatarImage.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                AvatarImage.Source = new BitmapImage(
+                    new Uri($"https://mc-heads.net/avatar/{Uri.EscapeDataString(account.Name)}/56"));
+                AvatarImage.Visibility = Visibility.Visible;
+            }
         }
-        AvatarImage.Source = new BitmapImage(
-            new Uri($"https://mc-heads.net/avatar/{Uri.EscapeDataString(account.Name)}/56"));
-        AvatarImage.Visibility = Visibility.Visible;
+        UpdateLaunchButtonState();
+    }
+
+    /// <summary>启动按钮：必须同时选了版本且有登录账号。</summary>
+    private void UpdateLaunchButtonState()
+    {
+        LaunchButton.IsEnabled = VersionComboBox.SelectedItem != null && HasAccount;
     }
 
     // 皮肤头加载失败（离线/无网络）：隐藏图片，露出默认 Head.png
@@ -157,7 +171,7 @@ public sealed partial class HomePage : Page
             }
         }
         VersionComboBox.SelectedItem = toSelect;
-        LaunchButton.IsEnabled = VersionComboBox.SelectedItem != null;
+        UpdateLaunchButtonState();
         VersionSettingsButton.IsEnabled = VersionComboBox.SelectedItem != null;
     }
 
@@ -236,7 +250,7 @@ public sealed partial class HomePage : Page
     private void VersionComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         // 只有选择了已下载的版本才能启动/进版本设置
-        LaunchButton.IsEnabled = VersionComboBox.SelectedItem != null;
+        UpdateLaunchButtonState();
         VersionSettingsButton.IsEnabled = VersionComboBox.SelectedItem != null;
         UpdatePlaytimeText();
     }
@@ -455,7 +469,7 @@ public sealed partial class HomePage : Page
             _launchCts = null;
             CancelLaunchButton.Visibility = Visibility.Collapsed;
             VersionComboBox.IsEnabled = true;
-            LaunchButton.IsEnabled = VersionComboBox.SelectedItem != null;
+            UpdateLaunchButtonState();
             // 无论正常退出还是崩溃，本次游玩时长都计入该版本
             if (playWatch != null)
             {

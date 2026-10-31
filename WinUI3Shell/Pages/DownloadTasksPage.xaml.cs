@@ -25,9 +25,7 @@ public sealed class JobRow : INotifyPropertyChanged
 
     /// <summary>内部持有任务对象（不公开，避免 XAML 类型信息生成器尝试实例化 DownloadJob）。</summary>
     internal DownloadJob Job { get; }
-    public string DisplayName => Job.IsMod
-        ? $"MOD · {Job.VersionId}"
-        : Job.IsModpack ? $"整合包 · {Job.InstallName}" : Job.InstallName + Job.AddonText;
+    public string DisplayName => DownloadManager.DisplayName(Job);
     public string StatusText => Job.StatusText;
     public bool Done => Job.Done;
     public Brush StatusBrush => (Brush)Application.Current.Resources[

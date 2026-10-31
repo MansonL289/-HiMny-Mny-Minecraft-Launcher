@@ -82,6 +82,70 @@
                     Tag="{Binding}" />
             </Grid>
         </DataTemplate>
+        <DataTemplate x:Key="InstallerItemTemplate">
+            <Grid Padding="0,6" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                <Image
+                    Width="32"
+                    Height="32"
+                    Source="{Binding IconUrl}"
+                    Stretch="Uniform" />
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        Text="{Binding Name}"
+                        TextTrimming="CharacterEllipsis" />
+                    <TextBlock
+                        FontSize="12"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{Binding DetailText}"
+                        TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <Button
+                    Grid.Column="2"
+                    VerticalAlignment="Center"
+                    Click="InstallInstaller_Click"
+                    Content="安装到版本"
+                    Tag="{Binding}" />
+                <Button
+                    Grid.Column="3"
+                    VerticalAlignment="Center"
+                    Click="DeleteInstaller_Click"
+                    Content="删除"
+                    Tag="{Binding}" />
+            </Grid>
+        </DataTemplate>
+        <DataTemplate x:Key="ServerItemTemplate">
+            <Grid Padding="0,6" ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                <FontIcon
+                    Glyph="&#xE7B8;"
+                    FontSize="20"
+                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                    VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock
+                        Style="{StaticResource BodyStrongTextBlockStyle}"
+                        Text="{Binding Name}"
+                        TextTrimming="CharacterEllipsis" />
+                    <TextBlock
+                        FontSize="12"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="{Binding DetailText}"
+                        TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <Button
+                    Grid.Column="2"
+                    VerticalAlignment="Center"
+                    Click="OpenServerFolder_Click"
+                    Content="打开文件夹"
+                    Tag="{Binding}" />
+                <Button
+                    Grid.Column="3"
+                    VerticalAlignment="Center"
+                    Click="DeleteServer_Click"
+                    Content="删除"
+                    Tag="{Binding}" />
+            </Grid>
+        </DataTemplate>
     </Page.Resources>
 
     <Grid Padding="24,12,24,16" ColumnDefinitions="180,*">
@@ -108,6 +172,7 @@
                         <NavigationViewItem Content="LiteLoader" Tag="liteloader" />
                     </NavigationViewItem.MenuItems>
                 </NavigationViewItem>
+                <NavigationViewItem Content="服务端" Tag="servers" />
             </NavigationView.MenuItems>
         </NavigationView>
 
@@ -166,18 +231,49 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- 安装器列表（按加载器筛选版本） -->
-                <Grid x:Name="LoaderPanel" Visibility="Collapsed">
+                <!-- 安装器列表：已下载的安装器 + 按加载器筛选的已安装版本 -->
+                <Grid x:Name="LoaderPanel" RowDefinitions="Auto,Auto,*" Visibility="Collapsed">
+                    <TextBlock
+                        x:Name="InstallerHeader"
+                        FontSize="12"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="已下载的安装器"
+                        Visibility="Collapsed" />
+                    <ListView
+                        x:Name="InstallerList"
+                        Grid.Row="1"
+                        Margin="0,4,0,12"
+                        MaxHeight="200"
+                        ItemTemplate="{StaticResource InstallerItemTemplate}"
+                        SelectionMode="None"
+                        Visibility="Collapsed" />
                     <ListView
                         x:Name="LoaderList"
+                        Grid.Row="2"
                         SelectionMode="None"
                         ItemTemplate="{StaticResource VersionItemTemplate}" />
                     <TextBlock
                         x:Name="LoaderEmpty"
+                        Grid.Row="2"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                         Text="还没有安装该加载器的版本"
+                        Visibility="Collapsed" />
+                </Grid>
+
+                <!-- 服务端：已下载的服务端 jar -->
+                <Grid x:Name="ServerPanel" Visibility="Collapsed">
+                    <ListView
+                        x:Name="ServerList"
+                        SelectionMode="None"
+                        ItemTemplate="{StaticResource ServerItemTemplate}" />
+                    <TextBlock
+                        x:Name="ServerEmpty"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="还没有下载的服务端，去「下载 - 服务端」里挑一个"
                         Visibility="Collapsed" />
                 </Grid>
             </Grid>

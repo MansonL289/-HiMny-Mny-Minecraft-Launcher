@@ -26,20 +26,12 @@
                         Header="OptiFine 版本"
                         HorizontalAlignment="Left"
                         PlaceholderText="正在获取版本列表…" />
-                    <TextBox
-                        x:Name="NameBox"
-                        Width="320"
-                        Header="安装名称"
-                        HorizontalAlignment="Left"
-                        PlaceholderText="例如 1.20.1-OptiFine" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button x:Name="InstallOfButton" Click="InstallOf_Click" Content="安装 OptiFine" />
-                        <ProgressRing
-                            x:Name="OfRing"
-                            Width="20"
-                            Height="20"
-                            IsActive="False"
-                            Visibility="Collapsed" />
+                        <Button
+                            x:Name="QueueOfButton"
+                            Click="QueueOf_Click"
+                            Content="加入下载列表"
+                            Style="{StaticResource AccentButtonStyle}" />
                     </StackPanel>
                 </StackPanel>
 
@@ -60,13 +52,12 @@
                         HorizontalAlignment="Left"
                         PlaceholderText="正在获取版本列表…" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button x:Name="InstallLlButton" Click="InstallLl_Click" Content="安装 LiteLoader" IsEnabled="False" />
-                        <ProgressRing
-                            x:Name="LlRing"
-                            Width="20"
-                            Height="20"
-                            IsActive="False"
-                            Visibility="Collapsed" />
+                        <Button
+                            x:Name="QueueLlButton"
+                            Click="QueueLl_Click"
+                            Content="加入下载列表"
+                            IsEnabled="False"
+                            Style="{StaticResource AccentButtonStyle}" />
                     </StackPanel>
                 </StackPanel>
 

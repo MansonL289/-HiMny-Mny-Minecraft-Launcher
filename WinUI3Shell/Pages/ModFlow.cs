@@ -32,6 +32,8 @@ public static class ModFlow
         "forge" => "Forge",
         "neoforge" => "NeoForge",
         "quilt" => "Quilt",
+        "optifine" => "OptiFine",
+        "liteloader" => "LiteLoader",
         "" => "原版",
         _ => kind,
     };
@@ -237,6 +239,269 @@ public static class ModFlow
             }
         }
         return map;
+    }
+
+    /// <summary>下载完成提示里的「安装」：MOD 装到可用的版本，安装器给适配的版本装加载器。</summary>
+    public static async Task InstallFromJobAsync(XamlRoot root, DownloadJob job)
+    {
+        if (job.IsMod)
+        {
+            await InstallModFromJobAsync(root, job);
+        }
+        else if (job.IsInstaller)
+        {
+            await InstallInstallerAsync(root, job.InstallerLoader, job.InstallerMc,
+                job.InstallerVersion, job.InstallerPath);
+        }
+    }
+
+    /// <summary>MOD 下载完成后安装：从库里取条目，选目标版本，后台安装。</summary>
+    private static async Task InstallModFromJobAsync(XamlRoot root, DownloadJob job)
+    {
+        var entry = job.ModProjectId.Length > 0
+            ? ModLibrary.Find(ModLibrary.Load(), job.ModProjectId)
+            : ModLibrary.Load().FirstOrDefault(e => e.Name == job.VersionId);
+        if (entry == null)
+        {
+            await ShowMessageAsync(root, "安装", "库里没有找到这个 Mod（可能已被删除）。");
+            return;
+        }
+        var targets = await PickTargetsAsync(root);
+        if (targets == null || targets.Count == 0) return;
+        DownloadManager.StartMod(entry.Name, async (installJob, ct) =>
+        {
+            var reporter = new Progress<ModInstallProgress>(p =>
+                DownloadManager.Report(installJob, p.Status, p.Fraction));
+            var outcomes = await InstallAsync(entry, targets, reporter, ct);
+            int ok = outcomes.Count(o => o.Ok);
+            var failed = outcomes.Where(o => !o.Ok).ToList();
+            DownloadManager.Report(installJob, failed.Count == 0
+                ? $"已安装到 {ok} 个版本"
+                : $"已安装到 {ok} 个版本，失败：{string.Join("；", failed.Select(f => $"{f.Dir}：{f.Text}"))}", 1);
+        }, entry.Id, isInstall: true);
+    }
+
+    /// <summary>安装器安装：选适配版本，用该加载器新建一个版本（走后台下载任务）。</summary>
+    /// <param name="installerPath">库里已下载的安装器 jar；OptiFine / LiteLoader 直接复用。</param>
+    public static async Task InstallInstallerAsync(XamlRoot root, string loader, string mcVersion,
+        string? loaderVersion, string? installerPath = null)
+    {
+        if (loader is "optifine" or "liteloader")
+        {
+            await InstallPatchAsync(root, loader, mcVersion, installerPath);
+            return;
+        }
+
+        McAddon addon = loader switch
+        {
+            "fabric" => McAddon.Fabric,
+            "forge" => McAddon.Forge,
+            "neoforge" => McAddon.NeoForge,
+            "quilt" => McAddon.Quilt,
+            _ => McAddon.None,
+        };
+        if (addon == McAddon.None)
+        {
+            await ShowMessageAsync(root, "安装", "这个安装器暂时不支持在启动器内安装，请用 java -jar 手动运行。");
+            return;
+        }
+
+        var all = LoadInstances();
+        var candidates = all
+            .Where(o => mcVersion.Length == 0
+                || o.McVersion.Equals(mcVersion, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            await ShowMessageAsync(root, "安装",
+                mcVersion.Length == 0
+                    ? "还没有已安装的版本，先下载一个游戏版本。"
+                    : $"还没有 Minecraft {mcVersion} 的版本，先下载一个该版本。");
+            return;
+        }
+
+        var targets = await PickVersionsAsync(root, "安装到版本", candidates);
+        if (targets == null || targets.Count == 0) return;
+
+        string loaderName = LoaderName(loader);
+        foreach (var target in targets)
+        {
+            string name = UniqueVersionName($"{target.Dir}-{loaderName}");
+            DownloadManager.Start(target.McVersion, name, AppSettings.DownloadMirror, addon, loaderVersion);
+        }
+        // 安装任务进下载列表，切到任务页可见进度
+        App.MainWindow?.ShowDownloadTasks();
+    }
+
+    /// <summary>OptiFine / LiteLoader：把库里的安装器打到所选的原版版本上，生成 &lt;原版&gt;-OptiFine 之类的版本。</summary>
+    private static async Task InstallPatchAsync(XamlRoot root, string loader, string mcVersion,
+        string? installerPath)
+    {
+        string loaderName = LoaderName(loader);
+        var candidates = LoadInstances()
+            .Where(o => o.LoaderKind.Length == 0
+                && (mcVersion.Length == 0
+                    || o.McVersion.Equals(mcVersion, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            await ShowMessageAsync(root, "安装", mcVersion.Length == 0
+                ? "还没有已安装的原版版本，先下载一个原版。"
+                : $"还没有 Minecraft {mcVersion} 的原版版本，先下载一个原版。");
+            return;
+        }
+
+        var targets = await PickVersionsAsync(root, $"安装{loaderName}", candidates);
+        if (targets == null || targets.Count == 0) return;
+
+        OptiFine.OfVersion? of = null;
+        LiteLoader.LlVersion? ll = null;
+        if (loader == "optifine")
+        {
+            of = ParseOptiFine(installerPath);
+            if (of == null)
+            {
+                await ShowMessageAsync(root, "安装", "安装器文件名无法识别 OptiFine 版本。");
+                return;
+            }
+        }
+        else
+        {
+            // LiteLoader 安装需要 tweakClass / 依赖列表，按库里的文件名回查元数据
+            var list = await LiteLoader.ListAsync();
+            string file = Path.GetFileName(installerPath ?? "");
+            ll = list.FirstOrDefault(v => LiteLoaderFileName(v) == file);
+            if (ll == null)
+            {
+                await ShowMessageAsync(root, "安装", "这个 LiteLoader 安装器版本已不在可用列表里，无法安装。");
+                return;
+            }
+        }
+
+        DownloadManager.StartMod($"{loaderName} · {mcVersion}", async (job, ct) =>
+        {
+            var progress = new Progress<McProgress>(p => DownloadManager.Report(job,
+                p.TotalFiles > 0 ? $"{p.Phase} ({p.DoneFiles}/{p.TotalFiles})" : p.Phase,
+                p.TotalFiles > 0 ? (double)p.DoneFiles / p.TotalFiles : 0));
+            foreach (var target in targets)
+            {
+                ct.ThrowIfCancellationRequested();
+                string name = UniqueVersionName($"{target.Dir}-{loaderName}");
+                if (loader == "optifine")
+                {
+                    await OptiFine.InstallAsync(target.Dir, target.McVersion, of!, name, progress, ct,
+                        installerPath);
+                }
+                else
+                {
+                    await LiteLoader.InstallAsync(target.Dir, ll!, name, progress, ct, installerPath);
+                }
+            }
+            DownloadManager.Report(job, $"已安装到 {targets.Count} 个版本", 1);
+        }, isInstall: true, kind: DownloadKind.Installer);
+    }
+
+    /// <summary>生成不与其他版本/进行中的任务重名的版本名。</summary>
+    private static string UniqueVersionName(string baseName)
+    {
+        string name = baseName;
+        for (int i = 2; Directory.Exists(VersionMeta.DirPath(name))
+            || DownloadManager.IsNameOrVersionBusy(name, ""); i++)
+        {
+            name = $"{baseName}-{i}";
+        }
+        return name;
+    }
+
+    /// <summary>LiteLoader 安装器在库里的固定文件名。</summary>
+    public static string LiteLoaderFileName(LiteLoader.LlVersion ll) =>
+        $"liteloader-{ll.McVersion}-{ll.Version}.jar";
+
+    /// <summary>OptiFine 安装器文件名 → (type, patch)，形如 OptiFine_1.20.1_HD_U_I6.jar。</summary>
+    private static OptiFine.OfVersion? ParseOptiFine(string? installerPath)
+    {
+        if (installerPath == null) return null;
+        string name = Path.GetFileName(installerPath);
+        string stem = Path.GetFileNameWithoutExtension(name);
+        var parts = stem.Split('_');
+        if (parts.Length < 4
+            || !parts[0].StartsWith("OptiFine", StringComparison.OrdinalIgnoreCase)) return null;
+        string type = string.Join('_', parts.Skip(2).Take(parts.Length - 3));
+        return new OptiFine.OfVersion(type, parts[^1], name, "");
+    }
+
+    /// <summary>从安装器文件名推导绑定的游戏版本（Forge / OptiFine / LiteLoader 文件名自带 MC 版本）。</summary>
+    public static string InstallerMcFromFileName(string loader, string fileName)
+    {
+        string stem = Path.GetFileNameWithoutExtension(fileName);
+        var parts = stem.Split(loader is "optifine" or "liteloader" ? '_' : '-');
+        if (loader.Equals("forge", StringComparison.OrdinalIgnoreCase))
+        {
+            // forge-<mc>-<version>-installer.jar
+            return parts.Length >= 4 && parts[0].Equals("forge", StringComparison.OrdinalIgnoreCase)
+                ? parts[1] : "";
+        }
+        if (loader.Equals("optifine", StringComparison.OrdinalIgnoreCase))
+        {
+            // OptiFine_<mc>_<type>_<patch>.jar
+            return parts.Length >= 4
+                && parts[0].StartsWith("OptiFine", StringComparison.OrdinalIgnoreCase) ? parts[1] : "";
+        }
+        if (loader.Equals("liteloader", StringComparison.OrdinalIgnoreCase))
+        {
+            // liteloader-<mc>-<version>.jar
+            return parts.Length >= 3
+                && parts[0].Equals("liteloader", StringComparison.OrdinalIgnoreCase) ? parts[1] : "";
+        }
+        return "";
+    }
+
+    /// <summary>Forge 安装器文件名 → Forge 版本号（forge-&lt;mc&gt;-&lt;version&gt;-installer.jar）。</summary>
+    public static string? InstallerVersionFromFileName(string loader, string fileName)
+    {
+        if (!loader.Equals("forge", StringComparison.OrdinalIgnoreCase)) return null;
+        var parts = Path.GetFileNameWithoutExtension(fileName).Split('-');
+        return parts.Length >= 4 && parts[0].Equals("forge", StringComparison.OrdinalIgnoreCase)
+            ? string.Join('-', parts.Skip(2).Take(parts.Length - 3))
+            : null;
+    }
+
+    /// <summary>弹窗多选目标版本（通用版，不做加载器限制）。</summary>
+    private static async Task<List<ModInstanceOption>?> PickVersionsAsync(XamlRoot root, string title,
+        List<ModInstanceOption> candidates)
+    {
+        var panel = new StackPanel { Spacing = 2 };
+        var boxes = new List<CheckBox>();
+        foreach (var option in candidates)
+        {
+            var box = new CheckBox { Content = option.Display, Tag = option };
+            boxes.Add(box);
+            panel.Children.Add(box);
+        }
+
+        var dialog = new ContentDialog
+        {
+            Title = title,
+            PrimaryButtonText = "安装",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Primary,
+            IsPrimaryButtonEnabled = false,
+            XamlRoot = root,
+            Content = new ScrollViewer { Content = panel, MaxHeight = 320 },
+        };
+        void Sync() => dialog.IsPrimaryButtonEnabled = boxes.Any(b => b.IsChecked == true);
+        foreach (var box in boxes)
+        {
+            box.Checked += (_, _) => Sync();
+            box.Unchecked += (_, _) => Sync();
+        }
+        if (boxes.Count == 1)
+        {
+            boxes[0].IsChecked = true;
+        }
+
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return null;
+        return boxes.Where(b => b.IsChecked == true).Select(b => (ModInstanceOption)b.Tag!).ToList();
     }
 
     public static async Task ShowMessageAsync(XamlRoot root, string title, string text)

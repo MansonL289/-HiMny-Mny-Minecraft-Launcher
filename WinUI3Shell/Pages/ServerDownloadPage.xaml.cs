@@ -86,7 +86,7 @@ public sealed partial class ServerDownloadPage : Page
         DownloadButton.IsEnabled = VersionList.SelectedItem is string;
     }
 
-    private async void Download_Click(object sender, RoutedEventArgs e)
+    private async void Queue_Click(object sender, RoutedEventArgs e)
     {
         if (VersionList.SelectedItem is not string versionId) return;
         DownloadButton.IsEnabled = false;
@@ -117,63 +117,12 @@ public sealed partial class ServerDownloadPage : Page
             return;
         }
 
-        var picker = new Windows.Storage.Pickers.FileSavePicker
-        {
-            SuggestedFileName = $"server-{versionId}.jar",
-            SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Downloads,
-        };
-        picker.FileTypeChoices.Add("JAR 文件", new List<string> { ".jar" });
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, App.MainWindow!.Hwnd);
-        var file = await picker.PickSaveFileAsync();
-        if (file == null)
-        {
-            StatusText.Text = "已取消保存。";
-            DownloadButton.IsEnabled = true;
-            return;
-        }
-
-        long total = server["size"]?.GetValue<long>() ?? 0;
-        long done = 0;
-        DlProgress.Visibility = Visibility.Visible;
-        DlProgress.IsIndeterminate = total <= 0;
-        DlProgress.Value = 0;
-        StatusText.Text = "正在下载服务端…";
-
-        var task = new McDownloadTask(
+        DownloadManager.StartFile($"服务端 {versionId}",
             Mirror.Rewrite(server["url"]!.GetValue<string>(), AppSettings.DownloadMirror),
-            file.Path,
-            server["sha1"]?.GetValue<string>(),
-            server["size"]?.GetValue<long>());
-        try
-        {
-            await Downloader.DownloadFileAsync(task, n =>
-            {
-                done += n;
-                if (total > 0)
-                {
-                    double percent = Math.Min(100, done * 100.0 / total);
-                    DlProgress.IsIndeterminate = false;
-                    DlProgress.Value = percent;
-                    StatusText.Text = $"正在下载服务端… {percent:F1}%";
-                }
-                else
-                {
-                    StatusText.Text = $"正在下载服务端… {done / 1024.0 / 1024.0:F1} MB";
-                }
-            }, default);
-            DlProgress.IsIndeterminate = false;
-            DlProgress.Value = 100;
-            StatusText.Text = $"已保存到 {file.Path}";
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = $"下载失败: {ex.Message}";
-        }
-        finally
-        {
-            DlProgress.Visibility = Visibility.Collapsed;
-            DownloadButton.IsEnabled = true;
-        }
+            $"server-{versionId}.jar", "server",
+            server["sha1"]?.GetValue<string>(), server["size"]?.GetValue<long>() ?? 0);
+        StatusText.Text = $"「服务端 {versionId}」已加入下载列表，完成后在库的「服务端」里查看。";
+        DownloadButton.IsEnabled = true;
     }
 
     private static async Task<JsonObject> FetchManifestAsync()
@@ -184,7 +133,7 @@ public sealed partial class ServerDownloadPage : Page
 
     private void OpenServerDir_Click(object sender, RoutedEventArgs e)
     {
-        string dir = Path.Combine(McPaths.GameDir, "server");
+        string dir = McPaths.ServerDir;
         Directory.CreateDirectory(dir);
         Process.Start(new ProcessStartInfo("explorer.exe", $"\"{dir}\"") { UseShellExecute = true });
         StatusText.Text = $"服务端文件夹: {dir}";

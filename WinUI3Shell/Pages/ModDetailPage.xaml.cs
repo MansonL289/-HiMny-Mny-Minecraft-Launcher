@@ -246,9 +246,8 @@ public sealed partial class ModDetailPage : Page
         : $"{Math.Max(bytes, 0) / 1024.0:0.#} KB";
 
     private DownloadJob? _pendingJob;
-    private ModLibraryEntry? _pendingEntry;
 
-    /// <summary>下载所选包进库（注册为全局下载任务），完成后询问是否安装到版本。</summary>
+    /// <summary>下载所选包进库（注册为全局下载任务），完成后由顶部横幅提供「安装」入口。</summary>
     private void Download_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { Tag: ModPackageItem item } || _busy) return;
@@ -262,7 +261,6 @@ public sealed partial class ModDetailPage : Page
         if (jar == null) return;
 
         _busy = true;
-        _pendingEntry = null;
         InstallBar.Value = 0;
         InstallBar.Visibility = Visibility.Visible;
         CancelButton.Visibility = Visibility.Visible;
@@ -276,7 +274,7 @@ public sealed partial class ModDetailPage : Page
             DownloadManager.Report(job, "下载到库…", 0);
             await ModInstaller.DownloadJarToAsync(jar, ModLibrary.DirFor(_project.ProjectId),
                 progress, "下载到库…", ct);
-            _pendingEntry = ModLibrary.UpsertFile(_project.ProjectId, _project.Title, _project.Author,
+            ModLibrary.UpsertFile(_project.ProjectId, _project.Title, _project.Author,
                 _project.IconUrl, new ModLibraryFile
                 {
                     Loader = loaderKind,
@@ -288,7 +286,7 @@ public sealed partial class ModDetailPage : Page
             bool zh = ModLang.SupportsChinese(
                 Path.Combine(ModLibrary.DirFor(_project.ProjectId), jar.FileName));
             DownloadManager.Report(job, zh ? "已加入 MOD 库（支持中文）" : "已加入 MOD 库", 1);
-        });
+        }, _project.ProjectId);
         DownloadManager.JobsChanged += OnJobChanged;
         // 任务可能在订阅前就结束（极小概率），主动同步一次
         OnJobChanged(null, EventArgs.Empty);
@@ -309,57 +307,7 @@ public sealed partial class ModDetailPage : Page
             CancelButton.Visibility = Visibility.Collapsed;
             _busy = false;
             _pendingJob = null;
-            // 页面可能已切走（XamlRoot 不可用就不弹安装窗，可从 MOD 库安装）
-            var entry = _pendingEntry;
-            _pendingEntry = null;
-            if (job.Error == null && !job.Cancelled && entry != null && XamlRoot != null)
-            {
-                _ = OfferInstallAsync(entry);
-            }
         });
-    }
-
-    /// <summary>入库完成后：询问是否立即安装到版本（多选，原版不可选）。</summary>
-    private async Task OfferInstallAsync(ModLibraryEntry entry)
-    {
-        try
-        {
-            if (!await ModFlow.ConfirmInstallAsync(XamlRoot, entry.Name))
-            {
-                return;
-            }
-            var targets = await ModFlow.PickTargetsAsync(XamlRoot);
-            if (targets == null || targets.Count == 0)
-            {
-                return;
-            }
-            _busy = true;
-            InstallBar.Value = 0;
-            InstallBar.Visibility = Visibility.Visible;
-            var progress = new Progress<ModInstallProgress>(p =>
-            {
-                StatusText.Text = p.Status;
-                InstallBar.Value = Math.Clamp(p.Fraction, 0, 1);
-            });
-            var outcomes = await ModFlow.InstallAsync(entry, targets, progress, CancellationToken.None);
-            int ok = outcomes.Count(o => o.Ok);
-            StatusText.Text = $"已安装到 {ok} 个版本";
-            var failed = outcomes.Where(o => !o.Ok).ToList();
-            if (failed.Count > 0)
-            {
-                await ModFlow.ShowMessageAsync(XamlRoot, entry.Name,
-                    string.Join("\n", failed.Select(f => $"{f.Dir}：{f.Text}")));
-            }
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = "安装失败：" + ex.Message;
-        }
-        finally
-        {
-            InstallBar.Visibility = Visibility.Collapsed;
-            _busy = false;
-        }
     }
 
     private void Cancel_Click(object sender, RoutedEventArgs e)

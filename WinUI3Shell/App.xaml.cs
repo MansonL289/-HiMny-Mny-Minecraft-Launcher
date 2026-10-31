@@ -1,6 +1,8 @@
 using System;
+using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.Win32;
 
 namespace WinUI3Shell;
@@ -21,6 +23,45 @@ public partial class App : Application
     public App()
     {
         InitializeComponent();
+        // 全局未处理异常：弹出对话框，避免静默闪退（退出码 0xC000027B）。
+        UnhandledException += (s, e) =>
+        {
+            e.Handled = true;
+            LogCrash(e.Exception);
+            try
+            {
+                var dlg = new ContentDialog
+                {
+                    Title = "程序异常",
+                    Content = e.Message + "\n\n" + e.Exception?.ToString(),
+                    CloseButtonText = "继续",
+                    XamlRoot = MainWindow?.Content?.XamlRoot,
+                };
+                _ = dlg.ShowAsync();
+            }
+            catch { /* 对话框也失败就忽略 */ }
+        };
+        // 后台任务未观察到的异常（fire-and-forget Task 抛错）：记日志，不让进程崩。
+        System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            e.SetObserved();
+            LogCrash(e.Exception);
+        };
+    }
+
+    private static void LogCrash(Exception ex)
+    {
+        try
+        {
+            string dir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "MnyMC");
+            Directory.CreateDirectory(dir);
+            string file = Path.Combine(dir, "crash.log");
+            File.AppendAllText(file,
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {ex}\n\n");
+        }
+        catch { /* 写日志失败不影响用户 */ }
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
@@ -36,6 +77,9 @@ public partial class App : Application
 
         // 断点不续传：上次启动被关掉/强杀留下的半截下载（.part）直接清空
         _ = System.Threading.Tasks.Task.Run(Services.Mc.Downloader.CleanupPartialDownloads);
+
+        // 注册系统通知通道（启动器不在前台时，下载完成会弹右下角通知）
+        Services.Notifications.Register();
 
         var window = new MainWindow();
         MainWindow = window;

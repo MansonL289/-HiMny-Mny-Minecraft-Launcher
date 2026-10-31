@@ -6,7 +6,7 @@ using WinUI3Shell.Services.Mc;
 
 namespace WinUI3Shell.Pages;
 
-/// <summary>Quilt 安装器下载子页面：列出 Quilt 官方安装器版本，用另存为方式下载。</summary>
+/// <summary>Quilt 安装器下载子页面：列出 Quilt 官方安装器版本，选中后加入下载列表。</summary>
 public sealed partial class QuiltPage : Page
 {
     private sealed record BuildItem(string Display, string Url, string FileName);
@@ -27,7 +27,7 @@ public sealed partial class QuiltPage : Page
     private async Task LoadListAsync()
     {
         LoadingRing.Visibility = Visibility.Visible;
-        SaveSelectedButton.IsEnabled = false;
+        QueueSelectedButton.IsEnabled = false;
         _builds.Clear();
         BuildList.ItemsSource = null;
         StatusText.Text = "正在获取版本列表…";
@@ -46,7 +46,7 @@ public sealed partial class QuiltPage : Page
             }
             BuildList.ItemsSource = _builds.Select(b => b.Display).ToList();
             StatusText.Text = _builds.Count > 0
-                ? $"共 {_builds.Count} 个，选中后点击“另存为下载所选”。"
+                ? $"共 {_builds.Count} 个，选中后点击“加入下载列表”。"
                 : "没有找到可用的 Quilt 安装器版本。";
         }
         catch (Exception ex)
@@ -61,31 +61,16 @@ public sealed partial class QuiltPage : Page
 
     private void BuildList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        SaveSelectedButton.IsEnabled = BuildList.SelectedIndex >= 0;
+        QueueSelectedButton.IsEnabled = BuildList.SelectedIndex >= 0;
     }
 
-    private async void SaveSelected_Click(object sender, RoutedEventArgs e)
+    /// <summary>把选中的安装器加入下载列表：下载进库，完成后由顶部提示提供「安装」。</summary>
+    private void QueueSelected_Click(object sender, RoutedEventArgs e)
     {
         if (BuildList.SelectedIndex < 0) return;
         var item = _builds[BuildList.SelectedIndex];
-
-        var picker = new Windows.Storage.Pickers.FileSavePicker();
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, App.MainWindow!.Hwnd);
-        picker.SuggestedFileName = item.FileName;
-        picker.FileTypeChoices.Add("JAR 文件", new List<string> { ".jar" });
-        var file = await picker.PickSaveFileAsync();
-        if (file == null) return;
-
-        StatusText.Text = "正在下载…";
-        try
-        {
-            await Downloader.DownloadManyAsync(
-                new List<McDownloadTask> { new(item.Url, file.Path) }, 1, item.FileName, null, default);
-            StatusText.Text = $"已保存到 {file.Path}";
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = $"下载失败: {ex.Message}";
-        }
+        string version = item.Display.Replace("Quilt Installer ", "");
+        DownloadManager.StartInstaller("quilt", "", $"Quilt Installer {version}", item.Url, item.FileName);
+        StatusText.Text = $"「Quilt Installer {version}」已加入下载列表，完成后在库或顶部提示里安装。";
     }
 }

@@ -11,7 +11,7 @@
         </Grid.RowDefinitions>
 
         <!-- 嵌入式标题栏：整条区域都可拖动窗口，标题栏按钮由系统绘制在右侧 -->
-        <Grid x:Name="AppTitleBar" Background="Transparent">
+        <Grid x:Name="AppTitleBar" Background="Transparent" ColumnDefinitions="*,Auto">
             <StackPanel
                 Orientation="Horizontal"
                 VerticalAlignment="Center"
@@ -23,22 +23,26 @@
                     Style="{StaticResource CaptionTextBlockStyle}"
                     FontWeight="SemiBold"
                     VerticalAlignment="Center" />
-                <!-- 全局下载指示：有后台下载任务时显示，点击跳到下载页 -->
-                <Button
-                    x:Name="DlIndicator"
-                    VerticalAlignment="Center"
-                    Visibility="Collapsed"
-                    Click="DlIndicator_Click">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                        <SymbolIcon Symbol="Download" />
-                        <ProgressRing
-                            Width="14"
-                            Height="14"
-                            IsActive="True"
-                            IsIndeterminate="True" />
-                    </StackPanel>
-                </Button>
             </StackPanel>
+
+            <!-- 全局下载指示：只在有后台下载任务时显示一个下载图标，切换带淡入缩放动画 -->
+            <Button
+                x:Name="DlIndicator"
+                Grid.Column="1"
+                Margin="0,0,150,0"
+                Padding="6"
+                VerticalAlignment="Center"
+                Background="Transparent"
+                BorderThickness="0"
+                Opacity="0"
+                Visibility="Collapsed"
+                RenderTransformOrigin="0.5,0.5"
+                Click="DlIndicator_Click">
+                <Button.RenderTransform>
+                    <ScaleTransform x:Name="DlIndicatorScale" />
+                </Button.RenderTransform>
+                <SymbolIcon Symbol="Download" />
+            </Button>
         </Grid>
 
         <NavigationView
@@ -92,40 +96,68 @@
             </Frame>
         </NavigationView>
 
-        <!-- 下载完成提示：顶部横幅，点击跳转到「库」 -->
+        <!-- 下载完成提示：WinUI 卡片风格，出现/消失带淡入上浮动画 -->
         <Border
             x:Name="DoneBanner"
             Grid.Row="1"
             VerticalAlignment="Top"
             HorizontalAlignment="Center"
             Margin="0,12,0,0"
-            Padding="16,10"
+            Padding="14,10"
             CornerRadius="8"
-            Background="{ThemeResource AccentFillColorDefaultBrush}"
+            BorderThickness="1"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
             Visibility="Collapsed"
+            Opacity="0"
+            RenderTransformOrigin="0.5,0"
             PointerEntered="DoneBanner_PointerEntered"
             PointerExited="DoneBanner_PointerExited">
-            <Button
-                x:Name="DoneBannerButton"
-                Background="Transparent"
-                BorderThickness="0"
-                Padding="0"
-                Click="DoneBanner_Click"
-                HorizontalAlignment="Stretch">
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                    <SymbolIcon Symbol="Accept" Foreground="White" />
-                    <TextBlock
-                        x:Name="DoneBannerText"
-                        Foreground="White"
-                        VerticalAlignment="Center"
-                        TextTrimming="CharacterEllipsis" />
-                    <TextBlock
-                        Foreground="White"
-                        Opacity="0.7"
-                        VerticalAlignment="Center"
-                        Text="前往库" />
-                </StackPanel>
-            </Button>
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="DoneBannerTransform" />
+            </Border.RenderTransform>
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                <Border
+                    Width="28"
+                    Height="28"
+                    VerticalAlignment="Center"
+                    Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                    CornerRadius="14">
+                    <Grid>
+                        <FontIcon
+                            x:Name="DoneBannerIconOk"
+                            Glyph="&#xE73E;"
+                            FontSize="14"
+                            Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                        <FontIcon
+                            x:Name="DoneBannerIconBad"
+                            Glyph="&#xE711;"
+                            FontSize="14"
+                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                            Visibility="Collapsed" />
+                    </Grid>
+                </Border>
+                <TextBlock
+                    x:Name="DoneBannerText"
+                    Grid.Column="1"
+                    MaxWidth="420"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource BodyTextBlockStyle}"
+                    TextTrimming="CharacterEllipsis" />
+                <Button
+                    Grid.Column="2"
+                    VerticalAlignment="Center"
+                    Click="DoneBannerView_Click"
+                    Content="查看" />
+                <Button
+                    x:Name="DoneBannerInstallButton"
+                    Grid.Column="3"
+                    VerticalAlignment="Center"
+                    Click="DoneBannerInstall_Click"
+                    Content="安装"
+                    Style="{StaticResource AccentButtonStyle}"
+                    Visibility="Collapsed" />
+            </Grid>
         </Border>
     </Grid>
 </Window>
