@@ -10,7 +10,7 @@ namespace WinUI3Shell.Services.Mc;
 /// </summary>
 public static class Diagnostics
 {
-    private const string AppVersion = "Beta 1.3.20261029";
+    private const string AppVersion = "Beta_1.4.20261101";
 
     /// <summary>把诊断信息打包到 destZip，返回该路径。</summary>
     public static Task<string> ExportAsync(string destZip) => Task.Run(() =>
