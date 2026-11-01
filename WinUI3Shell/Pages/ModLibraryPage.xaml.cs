@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media.Imaging;
 using WinUI3Shell.Services.Mc;
 
 namespace WinUI3Shell.Pages;
@@ -51,6 +52,8 @@ public sealed class InstallerItem
     public string Loader { get; set; } = "";
     public string Path { get; set; } = "";
     public string DetailText { get; set; } = "";
+    /// <summary>已用这个安装器装出的版本名；空 = 还没安装到任何版本。</summary>
+    public string InstalledVersion { get; set; } = "";
 
     public string IconUrl => Loader switch
     {
@@ -98,6 +101,82 @@ public sealed partial class ModLibraryPage : Page
 
     // ===== 版本 =====
 
+    /// <summary>版本分组：原版一栏，各加载器各一栏（按此顺序排列）。</summary>
+    private static readonly (string Key, string Title)[] VersionGroupDefs =
+    {
+        ("vanilla", "原版游戏"),
+        ("forge", "Forge"),
+        ("neoforge", "NeoForge"),
+        ("fabric", "Fabric"),
+        ("quilt", "Quilt"),
+        ("optifine", "OptiFine"),
+        ("liteloader", "LiteLoader"),
+        ("other", "其他"),
+        ("incomplete", "未完成安装"),
+    };
+
+    /// <summary>把「加载器显示文本」归类到分组键：原版 / forge / neoforge / fabric / quilt / optifine / liteloader / other。</summary>
+    private static string LoaderKey(string loader)
+    {
+        if (loader == "未完成") return "incomplete";
+        if (loader.Length == 0 || loader == "原版") return "vanilla";
+        if (loader.StartsWith("NeoForge", StringComparison.OrdinalIgnoreCase)) return "neoforge";
+        if (loader.StartsWith("Forge", StringComparison.OrdinalIgnoreCase)) return "forge";
+        if (loader.StartsWith("Fabric", StringComparison.OrdinalIgnoreCase)) return "fabric";
+        if (loader.StartsWith("Quilt", StringComparison.OrdinalIgnoreCase)) return "quilt";
+        if (loader.StartsWith("OptiFine", StringComparison.OrdinalIgnoreCase)) return "optifine";
+        if (loader.StartsWith("LiteLoader", StringComparison.OrdinalIgnoreCase)) return "liteloader";
+        return "other";
+    }
+
+    /// <summary>分组图标（安装器/版本共用）。</summary>
+    private static string? LoaderIcon(string key) => key switch
+    {
+        "vanilla" => "ms-appx:///Assets/icon_vanilla.png",
+        "forge" => "ms-appx:///Assets/icon_forge.png",
+        "fabric" => "ms-appx:///Assets/icon_fabric.png",
+        "neoforge" => "ms-appx:///Assets/icon_neoforge.png",
+        "quilt" => "ms-appx:///Assets/icon_quilt.png",
+        "optifine" => "ms-appx:///Assets/icon_optifine.png",
+        "liteloader" => "ms-appx:///Assets/icon_liteloader.png",
+        _ => null,
+    };
+
+    /// <summary>生成一栏（可展开/收起的下拉栏），内容用列表项模板渲染。</summary>
+    private FrameworkElement BuildGroup(string title, string? iconKey, int count, object itemsSource,
+        string templateKey)
+    {
+        var header = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        string? icon = iconKey == null ? null : LoaderIcon(iconKey);
+        if (icon != null)
+        {
+            header.Children.Add(new Image
+            {
+                Width = 20,
+                Height = 20,
+                Source = new BitmapImage(new Uri(icon)),
+            });
+        }
+        header.Children.Add(new TextBlock
+        {
+            Text = $"{title} ({count})",
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+
+        return new Expander
+        {
+            Header = header,
+            Content = new ItemsControl
+            {
+                ItemTemplate = (DataTemplate)Resources[templateKey],
+                ItemsSource = itemsSource,
+            },
+            IsExpanded = true,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+        };
+    }
+
     private void RefreshVersions()
     {
         _versions.Clear();
@@ -105,23 +184,32 @@ public sealed partial class ModLibraryPage : Page
         {
             var dirs = Directory.GetDirectories(McPaths.VersionsDir)
                 .Select(d => Path.GetFileName(d)!)
-                .OrderByDescending(n => n)
+                .OrderByDescending(n => n, StringComparer.OrdinalIgnoreCase)
                 .ToList();
             foreach (var dir in dirs)
             {
                 var meta = VersionMeta.Load(dir);
                 if (meta == null) continue;
-                string loader = meta.LoaderType(dir);
+                // 用 DetectLoader 才能识别 OptiFine / LiteLoader（LoaderType 只返回 4 种主流加载器）
+                string loader = meta.DetectLoader(dir);
+                bool complete = meta.IsComplete(dir);
                 _versions.Add(new VersionItem
                 {
                     Name = dir,
-                    Loader = loader.Length > 0 ? loader : "原版",
+                    Loader = complete ? (loader.Length > 0 ? loader : "原版") : "未完成",
                 });
             }
         }
-        VersionList.ItemsSource = _versions;
+
+        VersionGroups.Children.Clear();
+        foreach (var (key, title) in VersionGroupDefs)
+        {
+            var items = _versions.Where(v => LoaderKey(v.Loader) == key).ToList();
+            if (items.Count == 0) continue;
+            VersionGroups.Children.Add(BuildGroup(title, key, items.Count, items, "VersionItemTemplate"));
+        }
+
         VersionEmpty.Visibility = _versions.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        VersionList.Visibility = _versions.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void OpenVersionFolder_Click(object sender, RoutedEventArgs e)
@@ -290,42 +378,29 @@ public sealed partial class ModLibraryPage : Page
 
     private void RefreshLoaders()
     {
-        string? tag = null;
-        if (SideBar.SelectedItem is NavigationViewItem item)
-        {
-            tag = item.Tag?.ToString();
-        }
-
-        IEnumerable<VersionItem> filtered;
-        if (string.IsNullOrEmpty(tag) || tag == "loaders")
-        {
-            // 父栏目「安装器」：展示所有安装了加载器的版本
-            filtered = _versions.Where(v => v.Loader != "原版");
-        }
-        else
-        {
-            string loaderName = tag switch
-            {
-                "forge" => "Forge",
-                "fabric" => "Fabric",
-                "neoforge" => "NeoForge",
-                "quilt" => "Quilt",
-                "optifine" => "OptiFine",
-                "liteloader" => "LiteLoader",
-                _ => tag,
-            };
-            filtered = _versions.Where(v => v.Loader.StartsWith(loaderName, StringComparison.OrdinalIgnoreCase));
-        }
-
-        var list = filtered.ToList();
-        LoaderList.ItemsSource = list;
-        bool empty = list.Count == 0;
-        LoaderEmpty.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
-        LoaderList.Visibility = empty ? Visibility.Collapsed : Visibility.Visible;
+        string? tag = SideBar.SelectedItem is NavigationViewItem item ? item.Tag?.ToString() : null;
         RefreshInstallers(tag);
+
+        // 已安装 = 已经用这个安装器装出过版本；未安装 = 还没装过
+        var installed = _installers.Where(i => i.InstalledVersion.Length > 0).ToList();
+        var pending = _installers.Where(i => i.InstalledVersion.Length == 0).ToList();
+
+        LoaderGroups.Children.Clear();
+        if (installed.Count > 0)
+        {
+            LoaderGroups.Children.Add(BuildGroup("已安装", null, installed.Count,
+                installed, "InstallerItemTemplate"));
+        }
+        if (pending.Count > 0)
+        {
+            LoaderGroups.Children.Add(BuildGroup("未安装", null, pending.Count,
+                pending, "InstallerItemTemplate"));
+        }
+
+        LoaderEmpty.Visibility = _installers.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    /// <summary>刷新已下载的安装器列表（父栏目显示全部，子栏目只显示对应加载器）。</summary>
+    /// <summary>刷新已下载的安装器列表（父栏目显示全部，子栏目只显示对应加载器），并标出是否已装出过版本。</summary>
     private void RefreshInstallers(string? tag)
     {
         _installers.Clear();
@@ -338,22 +413,44 @@ public sealed partial class ModLibraryPage : Page
             {
                 string loader = Path.GetFileName(loaderDir).ToLowerInvariant();
                 if (filter != null && loader != filter) continue;
-                foreach (string jar in Directory.GetFiles(loaderDir, "*.jar").OrderByDescending(f => f))
+                foreach (string jar in Directory.GetFiles(loaderDir, "*.jar")
+                    .OrderByDescending(f => f, StringComparer.OrdinalIgnoreCase))
                 {
+                    string fileName = Path.GetFileName(jar);
+                    string installedAs = FindInstalledVersion(loader, fileName);
                     _installers.Add(new InstallerItem
                     {
-                        Name = Path.GetFileName(jar),
+                        Name = fileName,
                         Loader = loader,
                         Path = jar,
-                        DetailText = $"{ModFlow.LoaderName(loader)} 安装器 · 已放入库",
+                        InstalledVersion = installedAs,
+                        DetailText = installedAs.Length > 0
+                            ? $"{ModFlow.LoaderName(loader)} 安装器 · 已安装到「{installedAs}」"
+                            : $"{ModFlow.LoaderName(loader)} 安装器 · 未安装到任何版本",
                     });
                 }
             }
         }
-        InstallerList.ItemsSource = _installers;
-        bool any = _installers.Count > 0;
-        InstallerHeader.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
-        InstallerList.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>找出这个安装器已经装出的版本名（按加载器种类 + 文件名里的 MC 版本匹配）。</summary>
+    private string FindInstalledVersion(string loader, string fileName)
+    {
+        string mc = ModFlow.InstallerMcFromFileName(loader, fileName);
+        foreach (var v in _versions)
+        {
+            if (LoaderKey(v.Loader) != loader) continue;
+            if (mc.Length > 0)
+            {
+                var meta = VersionMeta.Load(v.Name);
+                if (meta == null || !meta.McVersion(v.Name).Equals(mc, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+            }
+            return v.Name;
+        }
+        return "";
     }
 
     /// <summary>安装已下载的安装器：选适配版本，用该加载器新建版本。</summary>
@@ -373,7 +470,7 @@ public sealed partial class ModLibraryPage : Page
             File.Delete(item.Path);
         }
         catch { /* 占用时留待下次覆盖 */ }
-        RefreshInstallers(SideBar.SelectedItem is NavigationViewItem nav ? nav.Tag?.ToString() : null);
+        RefreshLoaders();
     }
 
     // ===== 服务端 =====

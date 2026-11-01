@@ -35,16 +35,34 @@
                 <ListView.ItemTemplate>
                     <DataTemplate>
                         <Grid Padding="0,6" ColumnDefinitions="*,Auto">
-                            <StackPanel VerticalAlignment="Center">
+                            <StackPanel VerticalAlignment="Center" Spacing="2">
                                 <TextBlock
                                     FontWeight="SemiBold"
                                     Text="{Binding DisplayName}"
                                     TextTrimming="CharacterEllipsis" />
-                                <TextBlock
-                                    FontSize="12"
-                                    Foreground="{Binding StatusBrush}"
-                                    Text="{Binding StatusText}"
-                                    TextWrapping="Wrap" />
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <TextBlock
+                                        FontSize="12"
+                                        Foreground="{Binding StatusBrush}"
+                                        Text="{Binding StatusText}"
+                                        TextWrapping="Wrap" />
+                                    <TextBlock
+                                        Grid.Column="1"
+                                        FontSize="12"
+                                        FontWeight="SemiBold"
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="{Binding PercentText}"
+                                        Visibility="{Binding PercentVisibility}"
+                                        VerticalAlignment="Center" />
+                                </Grid>
+                                <!-- 下载进度条：进行中显示，完成后隐藏 -->
+                                <ProgressBar
+                                    Height="4"
+                                    Margin="0,2,0,0"
+                                    Minimum="0"
+                                    Maximum="1"
+                                    Value="{Binding Fraction}"
+                                    Visibility="{Binding ProgressVisibility}" />
                             </StackPanel>
                             <Button
                                 Grid.Column="1"

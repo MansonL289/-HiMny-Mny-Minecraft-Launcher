@@ -191,13 +191,12 @@
                     Content="刷新" />
             </Grid>
 
-            <!-- 版本列表 -->
+            <!-- 版本列表：原版一栏，各加载器各一栏 -->
             <Grid Grid.Row="2" Margin="0,12,0,0">
                 <Grid x:Name="VersionsPanel" Visibility="Visible">
-                    <ListView
-                        x:Name="VersionList"
-                        SelectionMode="None"
-                        ItemTemplate="{StaticResource VersionItemTemplate}" />
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="VersionGroups" Spacing="6" />
+                    </ScrollViewer>
                     <TextBlock
                         x:Name="VersionEmpty"
                         HorizontalAlignment="Center"
@@ -231,34 +230,17 @@
                     </StackPanel>
                 </Grid>
 
-                <!-- 安装器列表：已下载的安装器 + 按加载器筛选的已安装版本 -->
-                <Grid x:Name="LoaderPanel" RowDefinitions="Auto,Auto,*" Visibility="Collapsed">
-                    <TextBlock
-                        x:Name="InstallerHeader"
-                        FontSize="12"
-                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="已下载的安装器"
-                        Visibility="Collapsed" />
-                    <ListView
-                        x:Name="InstallerList"
-                        Grid.Row="1"
-                        Margin="0,4,0,12"
-                        MaxHeight="200"
-                        ItemTemplate="{StaticResource InstallerItemTemplate}"
-                        SelectionMode="None"
-                        Visibility="Collapsed" />
-                    <ListView
-                        x:Name="LoaderList"
-                        Grid.Row="2"
-                        SelectionMode="None"
-                        ItemTemplate="{StaticResource VersionItemTemplate}" />
+                <!-- 安装器列表：已安装（已装出对应版本）/ 未安装（还没装过）两栏 -->
+                <Grid x:Name="LoaderPanel" Visibility="Collapsed">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel x:Name="LoaderGroups" Spacing="6" />
+                    </ScrollViewer>
                     <TextBlock
                         x:Name="LoaderEmpty"
-                        Grid.Row="2"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
                         Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                        Text="还没有安装该加载器的版本"
+                        Text="还没有下载的安装器，去「下载」里挑一个"
                         Visibility="Collapsed" />
                 </Grid>
 

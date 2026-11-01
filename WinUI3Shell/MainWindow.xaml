@@ -24,24 +24,23 @@
                     FontWeight="SemiBold"
                     VerticalAlignment="Center" />
             </StackPanel>
-
-            <!-- 全局下载指示：只在有后台下载任务时显示一个下载图标，切换带淡入缩放动画 -->
+            <!-- 全局下载快捷入口：右上角（在系统窗口按钮左侧），有后台任务时显示 -->
             <Button
                 x:Name="DlIndicator"
                 Grid.Column="1"
-                Margin="0,0,150,0"
-                Padding="6"
+                Padding="10,4"
                 VerticalAlignment="Center"
-                Background="Transparent"
-                BorderThickness="0"
-                Opacity="0"
                 Visibility="Collapsed"
-                RenderTransformOrigin="0.5,0.5"
+                AutomationProperties.Name="下载任务"
                 Click="DlIndicator_Click">
-                <Button.RenderTransform>
-                    <ScaleTransform x:Name="DlIndicatorScale" />
-                </Button.RenderTransform>
-                <SymbolIcon Symbol="Download" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <SymbolIcon Symbol="Download" />
+                    <TextBlock
+                        x:Name="DlCountText"
+                        FontWeight="SemiBold"
+                        VerticalAlignment="Center"
+                        Text="0" />
+                </StackPanel>
             </Button>
         </Grid>
 
@@ -96,68 +95,66 @@
             </Frame>
         </NavigationView>
 
-        <!-- 下载完成提示：WinUI 卡片风格，出现/消失带淡入上浮动画 -->
+        <!-- 下载完成提示：顶部横幅，「查看」去库，「安装」直接选版本安装（MOD/安装器才有） -->
         <Border
             x:Name="DoneBanner"
             Grid.Row="1"
             VerticalAlignment="Top"
             HorizontalAlignment="Center"
             Margin="0,12,0,0"
-            Padding="14,10"
-            CornerRadius="8"
+            Padding="16,9"
+            CornerRadius="12"
             BorderThickness="1"
-            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
-            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
             Visibility="Collapsed"
             Opacity="0"
-            RenderTransformOrigin="0.5,0"
             PointerEntered="DoneBanner_PointerEntered"
             PointerExited="DoneBanner_PointerExited">
+            <!-- 80% 透明的毛玻璃：只给背景加亚克力，文字保持完全不透明，保证清晰 -->
+            <Border.Background>
+                <AcrylicBrush
+                    TintColor="{ThemeResource SystemChromeAltHighColor}"
+                    TintOpacity="0.2"
+                    TintLuminosityOpacity="0.9"
+                    FallbackColor="{ThemeResource SystemChromeMediumLowColor}" />
+            </Border.Background>
             <Border.RenderTransform>
-                <TranslateTransform x:Name="DoneBannerTransform" />
+                <TranslateTransform x:Name="DoneBannerTransform" Y="-16" />
             </Border.RenderTransform>
-            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
-                <Border
-                    Width="28"
-                    Height="28"
-                    VerticalAlignment="Center"
-                    Background="{ThemeResource ControlFillColorSecondaryBrush}"
-                    CornerRadius="14">
-                    <Grid>
-                        <FontIcon
-                            x:Name="DoneBannerIconOk"
-                            Glyph="&#xE73E;"
-                            FontSize="14"
-                            Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
-                        <FontIcon
-                            x:Name="DoneBannerIconBad"
-                            Glyph="&#xE711;"
-                            FontSize="14"
-                            Foreground="{ThemeResource SystemFillColorCriticalBrush}"
-                            Visibility="Collapsed" />
-                    </Grid>
-                </Border>
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <FontIcon
+                    Glyph="&#xE73E;"
+                    FontSize="14"
+                    Foreground="{ThemeResource SystemFillColorSuccessBrush}"
+                    VerticalAlignment="Center" />
                 <TextBlock
                     x:Name="DoneBannerText"
-                    Grid.Column="1"
-                    MaxWidth="420"
+                    FontSize="13"
+                    FontWeight="SemiBold"
+                    Foreground="{ThemeResource TextFillColorPrimaryBrush}"
                     VerticalAlignment="Center"
-                    Style="{StaticResource BodyTextBlockStyle}"
                     TextTrimming="CharacterEllipsis" />
                 <Button
-                    Grid.Column="2"
+                    Content="查看"
+                    Padding="12,4"
                     VerticalAlignment="Center"
-                    Click="DoneBannerView_Click"
-                    Content="查看" />
+                    Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                    BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Click="DoneBannerView_Click" />
                 <Button
                     x:Name="DoneBannerInstallButton"
-                    Grid.Column="3"
-                    VerticalAlignment="Center"
-                    Click="DoneBannerInstall_Click"
                     Content="安装"
-                    Style="{StaticResource AccentButtonStyle}"
-                    Visibility="Collapsed" />
-            </Grid>
+                    Padding="12,4"
+                    VerticalAlignment="Center"
+                    Background="{ThemeResource ControlFillColorSecondaryBrush}"
+                    BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="6"
+                    Visibility="Collapsed"
+                    Click="DoneBannerInstall_Click" />
+            </StackPanel>
         </Border>
     </Grid>
 </Window>

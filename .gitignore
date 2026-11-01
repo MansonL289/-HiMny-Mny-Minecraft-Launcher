@@ -12,3 +12,6 @@
 # Python 缓存
 __pycache__/
 *.pyc
+
+# 宣传片资料（本地保留，不进仓库）
+Promotional/

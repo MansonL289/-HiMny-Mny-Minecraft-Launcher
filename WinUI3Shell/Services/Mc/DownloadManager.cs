@@ -203,9 +203,43 @@ public static class DownloadManager
     public static void Report(DownloadJob job, string status, double fraction)
     {
         job.StatusText = status;
-        job.Fraction = fraction;
+        job.Fraction = Math.Clamp(fraction, 0, 1);
         JobsChanged?.Invoke(null, EventArgs.Empty);
     }
+
+    /// <summary>下载进度 → 0~1：优先按字节，取不到总字节时按文件数。</summary>
+    private static double FractionOf(McProgress p) => p.TotalBytes > 0
+        ? Math.Clamp((double)p.DoneBytes / p.TotalBytes, 0, 1)
+        : p.TotalFiles > 0 ? (double)p.DoneFiles / p.TotalFiles : 0;
+
+    /// <summary>版本安装各阶段按大致耗时占比映射到总进度，避免核心库下完后进度条就停在 100%。</summary>
+    private static double BandProgress(string phase, double local)
+    {
+        (double Start, double End) band = phase switch
+        {
+            "获取版本清单" or "下载 version.json" => (0.00, 0.02),
+            "核心与依赖库" => (0.02, 0.55),
+            "解压运行库" => (0.55, 0.57),
+            "资产索引" => (0.57, 0.58),
+            "资源文件" => (0.58, 0.97),
+            "整理旧版资源" => (0.97, 0.99),
+            "完成" => (0.99, 1.00),
+            "解压整合包配置" => (0.55, 0.60),
+            "整合包文件" => (0.60, 0.97),
+            _ => (0.55, 0.99), // 加载器安装等后续阶段
+        };
+        return band.Start + (band.End - band.Start) * Math.Clamp(local, 0, 1);
+    }
+
+    /// <summary>把下载器进度接到任务行（状态文字 + 百分比）。</summary>
+    private static Progress<McProgress> DownloadReporter(DownloadJob job, string phase) =>
+        new(p =>
+        {
+            string status = p.TotalFiles > 0
+                ? $"{phase}：{p.Phase} ({p.DoneFiles}/{p.TotalFiles})"
+                : $"{phase}：{p.Phase}";
+            Report(job, status, FractionOf(p));
+        });
 
     /// <summary>启动一个「安装器」下载任务：jar 下载进库的安装器目录，完成后可一键安装到适配版本。</summary>
     /// <param name="loader">加载器种类：forge / fabric / neoforge / quilt。</param>
@@ -244,7 +278,8 @@ public static class DownloadManager
                 string path = Path.Combine(dir, fileName);
                 Report(job, $"下载安装器：{fileName}", 0);
                 await Downloader.DownloadManyAsync(
-                    new List<McDownloadTask> { new(url, path) }, 1, fileName, null, job.Cts.Token);
+                    new List<McDownloadTask> { new(url, path) }, 1, fileName,
+                    DownloadReporter(job, "下载安装器"), job.Cts.Token);
                 job.InstallerPath = path;
                 job.Done = true;
                 job.Fraction = 1;
@@ -300,7 +335,8 @@ public static class DownloadManager
                 string path = Path.Combine(dir, fileName);
                 Report(job, $"下载：{fileName}", 0);
                 await Downloader.DownloadManyAsync(
-                    new List<McDownloadTask> { new(url, path, sha1, size) }, 1, fileName, null, job.Cts.Token);
+                    new List<McDownloadTask> { new(url, path, sha1, size) }, 1, fileName,
+                    DownloadReporter(job, "下载"), job.Cts.Token);
                 job.LocalPath = path;
                 job.Done = true;
                 job.Fraction = 1;
@@ -343,6 +379,8 @@ public static class DownloadManager
         var progress = new Progress<McProgress>(p =>
         {
             job.StatusText = p.TotalFiles > 0 ? $"{p.Phase} ({p.DoneFiles}/{p.TotalFiles})" : p.Phase;
+            // 进度只前进不后退（各阶段会重新开始计数，避免进度条来回跳）
+            job.Fraction = Math.Max(job.Fraction, BandProgress(p.Phase, FractionOf(p)));
             JobsChanged?.Invoke(null, EventArgs.Empty);
         });
         try

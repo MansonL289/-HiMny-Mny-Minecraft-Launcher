@@ -84,20 +84,29 @@ public static class Libraries
             var downloads = lib["downloads"]?.AsObject();
 
             var artifact = downloads?["artifact"]?.AsObject();
-            if (artifact?["url"] != null)
+            // 注意：有些库（如 Forge 内嵌 version.json 里的 forge:client）url 是空字符串，
+            // 这类文件由安装器处理器在本地生成（PATCHED），不能下载，只需补进 classpath。
+            string? artifactUrl = artifact?["url"] is { } urlNode ? urlNode.GetValue<string>() : null;
+            string? artifactPath = artifact?["path"]?.GetValue<string>();
+            if (!string.IsNullOrWhiteSpace(artifactUrl) && artifactPath != null)
             {
-                string rel = artifact["path"]!.GetValue<string>();
                 tasks.Add(new McDownloadTask(
-                    Mirror.Rewrite(artifact["url"]!.GetValue<string>(), mirror),
-                    Path.Combine(McPaths.LibrariesDir, rel),
-                    artifact["sha1"]?.GetValue<string>(),
+                    Mirror.Rewrite(artifactUrl, mirror),
+                    Path.Combine(McPaths.LibrariesDir, artifactPath),
+                    artifact!["sha1"]?.GetValue<string>(),
                     artifact["size"]?.GetValue<long>()));
-                classpath.Add(Path.Combine(McPaths.LibrariesDir, rel));
+                classpath.Add(Path.Combine(McPaths.LibrariesDir, artifactPath));
+            }
+            else if (artifactPath != null)
+            {
+                classpath.Add(Path.Combine(McPaths.LibrariesDir, artifactPath));
             }
             else if (downloads == null && MavenPath(lib["name"]?.GetValue<string>()) is { Length: > 0 } legacyRel)
             {
                 // 老格式库：没有 downloads，按 maven 坐标 + 仓库地址拼接
-                string repo = lib["url"]?.GetValue<string>() ?? "https://libraries.minecraft.net/";
+                string repo = lib["url"]?.GetValue<string>() is { Length: > 0 } rawRepo
+                    ? rawRepo
+                    : "https://libraries.minecraft.net/";
                 string dest = Path.Combine(McPaths.LibrariesDir, legacyRel.Replace('/', Path.DirectorySeparatorChar));
                 tasks.Add(new McDownloadTask(Mirror.Rewrite(repo.TrimEnd('/') + "/" + legacyRel, mirror), dest));
                 classpath.Add(dest);
@@ -109,11 +118,14 @@ public static class Libraries
             if (classifier != null)
             {
                 var entry = downloads?["classifiers"]?[classifier]?.AsObject();
-                if (entry?["url"] != null)
+                string? classifierUrl = entry?["url"] is { } classifierNode
+                    ? classifierNode.GetValue<string>()
+                    : null;
+                if (!string.IsNullOrWhiteSpace(classifierUrl))
                 {
                     var task = new McDownloadTask(
-                        Mirror.Rewrite(entry["url"]!.GetValue<string>(), mirror),
-                        Path.Combine(McPaths.LibrariesDir, entry["path"]!.GetValue<string>()),
+                        Mirror.Rewrite(classifierUrl, mirror),
+                        Path.Combine(McPaths.LibrariesDir, entry!["path"]!.GetValue<string>()),
                         entry["sha1"]?.GetValue<string>(),
                         entry["size"]?.GetValue<long>());
                     tasks.Add(task);
@@ -123,7 +135,9 @@ public static class Libraries
                     && MavenPath(lib["name"]?.GetValue<string>() + ":" + classifier) is { Length: > 0 } legacyNativeRel)
                 {
                     // 老格式 natives（如 1.5 时代的 lwjgl-platform）
-                    string repo = lib["url"]?.GetValue<string>() ?? "https://libraries.minecraft.net/";
+                    string repo = lib["url"]?.GetValue<string>() is { Length: > 0 } rawRepo
+                        ? rawRepo
+                        : "https://libraries.minecraft.net/";
                     var task = new McDownloadTask(
                         Mirror.Rewrite(repo.TrimEnd('/') + "/" + legacyNativeRel, mirror),
                         Path.Combine(McPaths.LibrariesDir, legacyNativeRel.Replace('/', Path.DirectorySeparatorChar)));

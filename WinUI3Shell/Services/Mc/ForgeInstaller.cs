@@ -156,6 +156,7 @@ public static class ForgeInstaller
                 // 安装器自带的 maven/ 依赖直接抽取，能省一笔下载
                 ExtractBundledLibraries(zip, profile["libraries"]?.AsArray());
 
+                // 内嵌 json 里 url 为空的库（如 forge:client）由下面的处理器本地生成，Collect 只补 classpath、不下载
                 var libTasks = CollectLibs(profile["libraries"]?.AsArray(), mirror)
                     .Concat(CollectLibs(embed["libraries"]?.AsArray(), mirror)).ToList();
                 await Downloader.DownloadManyAsync(libTasks, 8, $"{loaderName} 依赖库", progress, ct);
@@ -289,14 +290,19 @@ public static class ForgeInstaller
             }
         }
 
-        // 带 _SHA 后缀的数据键对应处理器输出文件，校验存在性
+        // 校验本次实际执行的 client 侧处理器声明的输出（outputs 形如 {"{PATCHED}":"{PATCHED_SHA}"}）
+        // 只校验这些处理器：server 侧产物（如 MC_UNPACKED）我们不执行、也不会生成
         // （不校验 sha1：生成的 jar 压缩方式可能不同导致哈希不一致，官方安装器同样处理）
-        foreach (var key in vars.Keys)
+        foreach (var proc in clientProcs)
         {
-            if (!key.EndsWith("_SHA", StringComparison.Ordinal)) continue;
-            if (vars.TryGetValue(key[..^4], out var file) && !File.Exists(file))
+            if (proc["outputs"] is not JsonObject outputs) continue;
+            foreach (var kv in outputs)
             {
-                throw new InvalidOperationException($"安装处理器未生成预期文件: {file}");
+                string key = kv.Key.Trim('{', '}');
+                if (vars.TryGetValue(key, out var file) && !File.Exists(file))
+                {
+                    throw new InvalidOperationException($"安装处理器未生成预期文件: {file}");
+                }
             }
         }
     }
@@ -463,7 +469,7 @@ public static class ForgeInstaller
             string rel = Libraries.MavenPath(name);
             if (rel.Length == 0) continue;
             string? url = lib["url"]?.GetValue<string>();
-            if (url != null)
+            if (!string.IsNullOrWhiteSpace(url))
             {
                 string dest = Path.Combine(McPaths.LibrariesDir, rel.Replace('/', Path.DirectorySeparatorChar));
                 tasks.Add(new McDownloadTask(Mirror.Rewrite(url.TrimEnd('/') + "/" + rel, mirror), dest));

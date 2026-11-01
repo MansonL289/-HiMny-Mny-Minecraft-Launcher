@@ -33,8 +33,7 @@ public sealed partial class HomePage : Page
         ApplyDefaultAvatar();
         ApplyAvatarShadow();
         // 下载任务状态变化时刷新版本列表（下载中的版本不可选）
-        DownloadManager.JobsChanged += (_, _) =>
-            DispatcherQueue.TryEnqueue(RefreshVersionList);
+        DownloadManager.JobsChanged += (_, _) => QueueVersionListRefresh();
     }
 
     private void HomePage_Loaded(object sender, RoutedEventArgs e)
@@ -61,6 +60,50 @@ public sealed partial class HomePage : Page
 
     /// <summary>供主窗口在从版本设置返回时刷新（改名/删除/置顶可能已变化）。</summary>
     public void RefreshVersions() => RefreshVersionList();
+
+    // 任务「结构」指纹：只有新增/结束/失败/取消才重建版本下拉框，进度变化不重建
+    private int _jobsSignature = -1;
+    private bool _refreshScheduled;
+    private bool _refreshWaitingForDropDown;
+
+    /// <summary>
+    /// 下载任务变化时刷新版本列表。进度回调每秒可能触发几十次，此时不重建列表；
+    /// 且下拉框展开期间绝不能替换 ItemsSource（WinUI 会抛 0x80070490 让进程直接退出）。
+    /// </summary>
+    private void QueueVersionListRefresh()
+    {
+        int signature = JobsSignature();
+        if (signature == _jobsSignature) return;
+        _jobsSignature = signature;
+        if (_refreshScheduled) return;
+        _refreshScheduled = true;
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            _refreshScheduled = false;
+            RefreshVersionList();
+        });
+    }
+
+    /// <summary>任务列表的结构指纹（忽略进度，只看任务集合与结束状态）。</summary>
+    private static int JobsSignature()
+    {
+        int hash = 17;
+        foreach (var job in DownloadManager.Jobs)
+        {
+            hash = hash * 31 + job.VersionId.GetHashCode();
+            hash = hash * 31 + job.InstallName.GetHashCode();
+            hash = hash * 31 + (job.Done ? 1 : 0) + (job.Cancelled ? 2 : 0) + (job.Error != null ? 4 : 0);
+        }
+        return hash;
+    }
+
+    // 下拉框收起后再补一次刷新（展开期间被推迟的）
+    private void VersionComboBox_DropDownClosed(object sender, object e)
+    {
+        if (!_refreshWaitingForDropDown) return;
+        _refreshWaitingForDropDown = false;
+        RefreshVersionList();
+    }
 
     // 默认头像：Head.png（在线账号加载失败时也回落到它）
     private void ApplyDefaultAvatar()
@@ -121,6 +164,13 @@ public sealed partial class HomePage : Page
     // 从 versions/ 目录刷新已下载的版本列表（置顶优先）；正在下载的版本列出但禁用
     private void RefreshVersionList()
     {
+        // 下拉框展开时替换 ItemsSource 会让 WinUI 抛 0x80070490（找不到元素）并直接退出进程
+        if (VersionComboBox.IsDropDownOpen)
+        {
+            _refreshWaitingForDropDown = true;
+            return;
+        }
+
         string? current = (VersionComboBox.SelectedItem as ComboBoxItem)?.Tag as string;
         var entries = Directory.Exists(McPaths.VersionsDir)
             ? Directory.GetDirectories(McPaths.VersionsDir)

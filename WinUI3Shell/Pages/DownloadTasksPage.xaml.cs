@@ -1,3 +1,4 @@
+using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
@@ -30,6 +31,14 @@ public sealed class JobRow : INotifyPropertyChanged
     public bool Done => Job.Done;
     public Brush StatusBrush => (Brush)Application.Current.Resources[
         Job.Error != null ? "SystemFillColorCriticalBrush" : "TextFillColorSecondaryBrush"];
+
+    /// <summary>进度 0~1（绑定 ProgressBar.Value）。</summary>
+    public double Fraction => Math.Clamp(Job.Fraction, 0, 1);
+    /// <summary>百分比文字，如 45%。</summary>
+    public string PercentText => $"{(int)Math.Round(Fraction * 100)}%";
+    /// <summary>进行中的任务才显示进度条/百分比。</summary>
+    public Visibility ProgressVisibility => Job.Done ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility PercentVisibility => ProgressVisibility;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

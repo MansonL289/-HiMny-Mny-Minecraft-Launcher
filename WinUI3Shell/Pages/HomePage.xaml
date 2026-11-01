@@ -120,7 +120,8 @@
                     x:Name="VersionComboBox"
                     Width="180"
                     PlaceholderText="选择版本"
-                    SelectionChanged="VersionComboBox_SelectionChanged" />
+                    SelectionChanged="VersionComboBox_SelectionChanged"
+                    DropDownClosed="VersionComboBox_DropDownClosed" />
             </StackPanel>
 
             <StackPanel

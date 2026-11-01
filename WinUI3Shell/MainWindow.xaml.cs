@@ -42,6 +42,10 @@ public sealed partial class MainWindow : Window
 
         // 与设置、任务管理器一致的高标题栏（48px），标题栏按钮垂直居中
         AppWindow.TitleBar.PreferredHeightOption = TitleBarHeightOption.Tall;
+        // 下载入口留出系统窗口按钮的宽度（随 DPI 变化，避免压到最小化/关闭按钮）
+        int rightInset = AppWindow.TitleBar.RightInset;
+        if (rightInset <= 0) rightInset = 140; // 尚未计算出来时用保守值
+        DlIndicator.Margin = new Thickness(0, 0, rightInset + 8, 0);
         UpdateTitleBarColors();
 
         if (Content is FrameworkElement root)
@@ -86,10 +90,6 @@ public sealed partial class MainWindow : Window
     private readonly HashSet<DownloadJob> _notifiedJobs = new();
     private DispatcherTimer? _bannerTimer;
     private bool _bannerHovering;
-    private Storyboard? _bannerStoryboard;
-    private int _bannerAnimToken;
-    private bool _dlIndicatorShown;
-    private int _dlAnimToken;
 
     // 下载任务状态变化（来自后台线程，需切回 UI 线程）
     private void OnJobsChanged(object? sender, EventArgs e)
@@ -97,9 +97,13 @@ public sealed partial class MainWindow : Window
         DispatcherQueue.TryEnqueue(() =>
         {
             var jobs = DownloadManager.Jobs;
-            UpdateDlIndicator(jobs.Any(j => !j.Done));
-            ToolTipService.SetToolTip(DlIndicator, string.Join('\n',
-                jobs.Select(j => $"{j.VersionId}：{j.StatusText}")));
+            int running = jobs.Count(j => !j.Done);
+            DlIndicator.Visibility = running > 0 ? Visibility.Visible : Visibility.Collapsed;
+            DlCountText.Text = running.ToString();
+            ToolTipService.SetToolTip(DlIndicator, running > 0
+                ? $"{running} 个下载任务进行中，点击查看\n" + string.Join('\n',
+                    jobs.Where(j => !j.Done).Select(j => $"{j.VersionId}：{j.StatusText}"))
+                : "下载任务");
 
             // 检测刚完成的任务，弹顶部提示
             foreach (var job in jobs)
@@ -126,10 +130,47 @@ public sealed partial class MainWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
         DoneBanner.Visibility = Visibility.Visible;
+        PlayBannerIn();
         StartBannerTimer();
 
         // 启动器不在前台（最小化/被别的窗口盖住）：额外弹一条系统通知
         if (!IsForegroundWindow()) Notifications.ShowDownloadDone(job);
+    }
+
+    private Storyboard? _bannerStoryboard;
+
+    /// <summary>横幅入场：淡入 + 从上方滑下（CubicEase 减速，非线性）。</summary>
+    private void PlayBannerIn()
+    {
+        _bannerStoryboard?.Stop();
+        DoneBanner.Opacity = 0;
+        DoneBannerTransform.Y = -16;
+
+        var sb = new Storyboard();
+        var fade = new DoubleAnimation
+        {
+            From = 0,
+            To = 1,
+            Duration = new Duration(TimeSpan.FromMilliseconds(180)),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+        };
+        Storyboard.SetTarget(fade, DoneBanner);
+        Storyboard.SetTargetProperty(fade, "Opacity");
+
+        var slide = new DoubleAnimation
+        {
+            From = -16,
+            To = 0,
+            Duration = new Duration(TimeSpan.FromMilliseconds(320)),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+        };
+        Storyboard.SetTarget(slide, DoneBannerTransform);
+        Storyboard.SetTargetProperty(slide, "Y");
+
+        sb.Children.Add(fade);
+        sb.Children.Add(slide);
+        _bannerStoryboard = sb;
+        sb.Begin();
     }
 
     /// <summary>当前前台窗口是否就是启动器自己。</summary>
@@ -154,7 +195,7 @@ public sealed partial class MainWindow : Window
         _bannerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         _bannerTimer.Tick += (_, _) =>
         {
-            if (!_bannerHovering) DoneBanner.Visibility = Visibility.Collapsed;
+            if (!_bannerHovering) HideDoneBanner();
         };
         _bannerTimer.Start();
     }
@@ -186,10 +227,37 @@ public sealed partial class MainWindow : Window
         await ModFlow.InstallFromJobAsync(root, job);
     }
 
+    /// <summary>横幅出场：淡出 + 略微上移（CubicEase 加速）。</summary>
     private void HideDoneBanner()
     {
-        DoneBanner.Visibility = Visibility.Collapsed;
         _bannerTimer?.Stop();
+        if (DoneBanner.Visibility != Visibility.Visible) return;
+
+        _bannerStoryboard?.Stop();
+        var sb = new Storyboard();
+        var fade = new DoubleAnimation
+        {
+            To = 0,
+            Duration = new Duration(TimeSpan.FromMilliseconds(140)),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn },
+        };
+        Storyboard.SetTarget(fade, DoneBanner);
+        Storyboard.SetTargetProperty(fade, "Opacity");
+
+        var slide = new DoubleAnimation
+        {
+            To = -10,
+            Duration = new Duration(TimeSpan.FromMilliseconds(140)),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn },
+        };
+        Storyboard.SetTarget(slide, DoneBannerTransform);
+        Storyboard.SetTargetProperty(slide, "Y");
+
+        sb.Children.Add(fade);
+        sb.Children.Add(slide);
+        sb.Completed += (_, _) => DoneBanner.Visibility = Visibility.Collapsed;
+        _bannerStoryboard = sb;
+        sb.Begin();
     }
 
     /// <summary>跳到「库」页并切到对应栏目（下载完成的内容在哪个栏目就显示哪个；系统通知点「查看」也走这里）。</summary>
